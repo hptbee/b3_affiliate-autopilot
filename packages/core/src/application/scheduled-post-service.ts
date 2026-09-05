@@ -1,4 +1,3 @@
-import type { Content } from '../domain/content.js';
 import type { ScheduledPost } from '../domain/scheduled-post.js';
 import {
   canCancelScheduledPost,
@@ -6,6 +5,7 @@ import {
   MAX_PUBLISH_RETRIES,
 } from '../domain/scheduled-post.js';
 import type { SocialAccount } from '../domain/social-account.js';
+import type { UserContext } from '../types/user-context.js';
 import { ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
 import type { ContentRepository } from './content-service.js';
 
@@ -18,12 +18,17 @@ export interface CreateScheduledPostInput {
 export interface ScheduledPostRepository {
   create(input: CreateScheduledPostInput): Promise<ScheduledPost>;
   findById(id: string): Promise<ScheduledPost | null>;
-  findAll(): Promise<ScheduledPost[]>;
+  findByUserId(userId: string): Promise<ScheduledPost[]>;
+  findByContentId(contentId: string): Promise<ScheduledPost[]>;
   findDue(now: Date): Promise<ScheduledPost[]>;
   cancel(id: string): Promise<ScheduledPost>;
-  acquirePublishingLock(id: string): Promise<boolean>;
+  claimForQueue(id: string, now: Date): Promise<boolean>;
+  acquirePublishingLock(id: string, now: Date): Promise<boolean>;
   markPublished(id: string, externalPostId: string): Promise<ScheduledPost>;
   markFailed(id: string, error: string): Promise<ScheduledPost>;
+  markUncertain(id: string, error: string): Promise<ScheduledPost>;
+  markDead(id: string, error: string): Promise<ScheduledPost>;
+  reclaimStalePublishing(now: Date, leaseMs: number): Promise<number>;
 }
 
 export interface SocialAccountRepository {
@@ -38,58 +43,54 @@ export class ScheduledPostService {
     private readonly socialAccountRepository: SocialAccountRepository,
   ) {}
 
-  async create(input: CreateScheduledPostInput): Promise<ScheduledPost> {
+  async create(user: UserContext, input: CreateScheduledPostInput): Promise<ScheduledPost> {
     const content = await this.contentRepository.findById(input.contentId);
-    if (!content) {
+    if (!content || content.userId !== user.userId) {
       throw new NotFoundError('Content', input.contentId);
     }
 
-    if (content.status === 'cancelled') {
-      throw new ConflictError('Cannot schedule cancelled content');
-    }
-
-    if (content.status !== 'approved' && content.status !== 'draft') {
+    if (content.status !== 'approved') {
       throw new ConflictError(
-        `Content must be draft or approved to schedule, current status: ${content.status}`,
+        `Content must be approved to schedule, current status: ${content.status}`,
       );
     }
 
     const account = await this.socialAccountRepository.findById(input.socialAccountId);
-    if (!account) {
+    if (!account || account.userId !== user.userId) {
       throw new NotFoundError('SocialAccount', input.socialAccountId);
     }
 
-    if (account.userId !== content.userId) {
-      throw new ValidationError('Social account does not belong to content owner');
+    if (account.platform !== 'tiktok') {
+      throw new ValidationError('MVP only supports TikTok accounts');
     }
 
     if (input.scheduledAt.getTime() <= Date.now()) {
       throw new ValidationError('Scheduled time must be in the future');
     }
 
-    const scheduledPost = await this.scheduledPostRepository.create(input);
-
-    if (content.status === 'draft' || content.status === 'approved') {
-      await this.contentRepository.update(content.id, { status: 'scheduled' });
-    }
-
-    return scheduledPost;
+    return this.scheduledPostRepository.create(input);
   }
 
-  async getById(id: string): Promise<ScheduledPost> {
+  async getById(user: UserContext, id: string): Promise<ScheduledPost> {
     const post = await this.scheduledPostRepository.findById(id);
     if (!post) {
       throw new NotFoundError('ScheduledPost', id);
     }
+
+    const content = await this.contentRepository.findById(post.contentId);
+    if (!content || content.userId !== user.userId) {
+      throw new NotFoundError('ScheduledPost', id);
+    }
+
     return post;
   }
 
-  async list(): Promise<ScheduledPost[]> {
-    return this.scheduledPostRepository.findAll();
+  async list(user: UserContext): Promise<ScheduledPost[]> {
+    return this.scheduledPostRepository.findByUserId(user.userId);
   }
 
-  async cancel(id: string): Promise<ScheduledPost> {
-    const post = await this.getById(id);
+  async cancel(user: UserContext, id: string): Promise<ScheduledPost> {
+    const post = await this.getById(user, id);
 
     if (!canCancelScheduledPost(post.status)) {
       throw new ConflictError(`Cannot cancel scheduled post with status: ${post.status}`);
@@ -103,8 +104,14 @@ export class ScheduledPostService {
   }
 
   validatePublishable(post: ScheduledPost): void {
-    if (post.status === 'published') {
+    if (post.externalPostId) {
       throw new ConflictError('Post is already published', { scheduledPostId: post.id });
+    }
+
+    if (post.status === 'uncertain') {
+      throw new ConflictError('Post has an uncertain publish outcome and must not be retried', {
+        scheduledPostId: post.id,
+      });
     }
 
     if (!isPublishable(post.status)) {
@@ -121,5 +128,3 @@ export class ScheduledPostService {
     }
   }
 }
-
-export type { Content };

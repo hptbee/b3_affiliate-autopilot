@@ -2,7 +2,7 @@
   "name": "social-autopilot",
   "version": "0.1.0",
   "private": true,
-  "description": "Cloudflare-native AI social media automation platform",
+  "description": "Cloudflare-native AI TikTok content automation platform",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",

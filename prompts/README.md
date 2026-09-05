@@ -1,4 +1,5 @@
-# Prompt templates for AI content generation
-# These are imported by @social-autopilot/ai — edit the source files in packages/ai/src/prompts/
+# Prompts
 
-See `packages/ai/src/prompts/` for the canonical prompt definitions.
+Canonical TikTok draft prompts live in `packages/ai/src/prompts/`.
+
+The structured draft schema is `tiktokContentDraftSchema` (`hook`, `script`, `caption`, `hashtags`, `cta`, `suggestedPublishAt`, `qualityScore`).

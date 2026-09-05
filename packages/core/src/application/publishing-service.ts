@@ -1,7 +1,7 @@
 import type { Content } from '../domain/content.js';
 import type { ScheduledPost } from '../domain/scheduled-post.js';
-import type { SocialAccount } from '../domain/social-account.js';
-import { ConflictError, NotFoundError, SocialPublishError } from '../types/errors.js';
+import type { SocialAccount, SocialPlatform } from '../domain/social-account.js';
+import { SocialPublishError, NotFoundError } from '../types/errors.js';
 import type { Logger } from '../types/logger.js';
 import type { ContentRepository } from './content-service.js';
 import type { ScheduledPostRepository } from './scheduled-post-service.js';
@@ -11,16 +11,17 @@ export interface PublishPostInput {
   content: Content;
   socialAccount: SocialAccount;
   scheduledPost: ScheduledPost;
+  idempotencyKey: string;
 }
 
 export interface PublishPostResult {
   externalPostId: string;
-  platform: string;
+  platform: SocialPlatform;
   publishedAt: Date;
 }
 
 export interface SocialPublisher {
-  platform: SocialAccount['platform'];
+  platform: SocialPlatform;
   publish(input: PublishPostInput): Promise<PublishPostResult>;
 }
 
@@ -29,7 +30,7 @@ export class PublishingService {
     private readonly scheduledPostRepository: ScheduledPostRepository,
     private readonly contentRepository: ContentRepository,
     private readonly socialAccountRepository: SocialAccountRepository,
-    private readonly publishers: Map<SocialAccount['platform'], SocialPublisher>,
+    private readonly publishers: Map<SocialPlatform, SocialPublisher>,
     private readonly logger: Logger,
   ) {}
 
@@ -41,22 +42,32 @@ export class PublishingService {
       throw new NotFoundError('ScheduledPost', scheduledPostId);
     }
 
-    // Idempotency: already published
-    if (post.status === 'published' && post.externalPostId) {
-      this.logger.info('Post already published, acknowledging', {
+    if (post.externalPostId) {
+      this.logger.info('Post already has externalPostId, acknowledging', {
         operation: 'publishing.publishScheduledPost',
         entityId: scheduledPostId,
         status: 'published',
       });
       return {
         externalPostId: post.externalPostId,
-        platform: 'unknown',
+        platform: 'tiktok',
         publishedAt: post.publishedAt ?? new Date(),
       };
     }
 
-    // Idempotency: another worker owns the job
-    const acquired = await this.scheduledPostRepository.acquirePublishingLock(scheduledPostId);
+    if (post.status === 'uncertain') {
+      this.logger.warn('Skipping uncertain post; will not retry', {
+        operation: 'publishing.publishScheduledPost',
+        entityId: scheduledPostId,
+        status: 'uncertain',
+      });
+      return null;
+    }
+
+    const acquired = await this.scheduledPostRepository.acquirePublishingLock(
+      scheduledPostId,
+      new Date(),
+    );
     if (!acquired) {
       this.logger.info('Could not acquire publishing lock, skipping', {
         operation: 'publishing.publishScheduledPost',
@@ -79,13 +90,20 @@ export class PublishingService {
 
       const publisher = this.publishers.get(account.platform);
       if (!publisher) {
-        throw new SocialPublishError(`No publisher configured for platform: ${account.platform}`);
+        throw new SocialPublishError(
+          `No publisher configured for platform: ${account.platform}`,
+          'dead',
+        );
       }
 
-      const result = await publisher.publish({ content, socialAccount: account, scheduledPost: post });
+      const result = await publisher.publish({
+        content,
+        socialAccount: account,
+        scheduledPost: post,
+        idempotencyKey: scheduledPostId,
+      });
 
       await this.scheduledPostRepository.markPublished(scheduledPostId, result.externalPostId);
-      await this.contentRepository.update(content.id, { status: 'published' });
 
       this.logger.info('Successfully published scheduled post', {
         operation: 'publishing.publishScheduledPost',
@@ -96,15 +114,24 @@ export class PublishingService {
 
       return result;
     } catch (error) {
+      const outcome =
+        error instanceof SocialPublishError ? error.outcome : ('failed' as const);
       const message = error instanceof Error ? error.message : 'Unknown publish error';
-      await this.scheduledPostRepository.markFailed(scheduledPostId, message);
+
+      if (outcome === 'uncertain') {
+        await this.scheduledPostRepository.markUncertain(scheduledPostId, message);
+      } else if (outcome === 'dead') {
+        await this.scheduledPostRepository.markDead(scheduledPostId, message);
+      } else {
+        await this.scheduledPostRepository.markFailed(scheduledPostId, message);
+      }
 
       this.logger.error('Failed to publish scheduled post', {
         operation: 'publishing.publishScheduledPost',
         entityId: scheduledPostId,
-        status: 'failed',
+        status: outcome,
         duration: Date.now() - start,
-        errorCode: error instanceof ConflictError ? 'CONFLICT' : 'SOCIAL_PUBLISH_ERROR',
+        errorCode: 'SOCIAL_PUBLISH_ERROR',
       });
 
       throw error;

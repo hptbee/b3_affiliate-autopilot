@@ -3,25 +3,30 @@ import type { AIProvider } from '../providers/types.js';
 import type { ContentService } from '@social-autopilot/core';
 import { ContentAgent } from '../agents/content-agent.js';
 
-function createMockAIProvider(response: { title: string; body: string }): AIProvider {
+function createMockAIProvider(): AIProvider {
   return {
     name: 'mock',
     generateText: vi.fn(),
-    generateStructured: vi.fn(
-      async <T,>(_input: unknown) => response as T,
-    ) as AIProvider['generateStructured'],
+    generateStructured: vi.fn(async () => ({
+      hook: 'Wait for this',
+      script: 'Here is the script',
+      caption: 'Caption text',
+      hashtags: ['fyp'],
+      cta: 'Follow for more',
+      qualityScore: 0.8,
+    })) as AIProvider['generateStructured'],
   };
 }
 
 function createMockContentService(): ContentService {
   return {
-    create: vi.fn(async (input) => ({
+    create: vi.fn(async (_user, input) => ({
       id: 'content-123',
-      userId: input.userId,
+      userId: _user.userId,
       title: input.title,
       body: input.body,
       status: 'draft' as const,
-      contentType: 'text' as const,
+      contentType: 'video' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
@@ -29,21 +34,20 @@ function createMockContentService(): ContentService {
 }
 
 describe('ContentAgent', () => {
-  it('generates and persists a draft', async () => {
-    const ai = createMockAIProvider({ title: 'Test Title', body: 'Test Body' });
+  it('generates and persists a TikTok draft for the current user', async () => {
+    const ai = createMockAIProvider();
     const contentService = createMockContentService();
     const agent = new ContentAgent(ai, contentService);
 
-    const result = await agent.generateDraft(
-      { userId: 'user-1' },
-      { topic: 'Cloudflare Workers' },
-    );
+    const result = await agent.generateDraft({ userId: 'user-1' }, { topic: 'Cloudflare Workers' });
 
     expect(result.success).toBe(true);
     expect(result.data?.contentId).toBe('content-123');
-    expect(result.data?.title).toBe('Test Title');
-    expect(ai.generateStructured).toHaveBeenCalledOnce();
-    expect(contentService.create).toHaveBeenCalledOnce();
+    expect(result.data?.title).toBe('Wait for this');
+    expect(contentService.create).toHaveBeenCalledWith(
+      { userId: 'user-1' },
+      expect.objectContaining({ contentType: 'video' }),
+    );
   });
 
   it('returns error on AI failure', async () => {
@@ -56,10 +60,7 @@ describe('ContentAgent', () => {
     };
     const agent = new ContentAgent(ai, createMockContentService());
 
-    const result = await agent.generateDraft(
-      { userId: 'user-1' },
-      { topic: 'Test' },
-    );
+    const result = await agent.generateDraft({ userId: 'user-1' }, { topic: 'Test' });
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('AI unavailable');

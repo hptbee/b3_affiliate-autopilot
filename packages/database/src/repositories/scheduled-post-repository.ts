@@ -1,7 +1,7 @@
 function generateId(): string {
   return crypto.randomUUID();
 }
-import { and, eq, inArray, lte, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type {
   ScheduledPost,
@@ -9,7 +9,7 @@ import type {
   CreateScheduledPostInput,
   ScheduledPostRepository,
 } from '@social-autopilot/core';
-import { scheduledPosts } from '../schema/index.js';
+import { contents, scheduledPosts } from '../schema/index.js';
 import type * as schema from '../schema/index.js';
 
 function mapScheduledPost(row: typeof scheduledPosts.$inferSelect): ScheduledPost {
@@ -23,6 +23,8 @@ function mapScheduledPost(row: typeof scheduledPosts.$inferSelect): ScheduledPos
     externalPostId: row.externalPostId,
     error: row.error,
     retryCount: row.retryCount,
+    queuedAt: row.queuedAt,
+    publishingStartedAt: row.publishingStartedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -43,6 +45,8 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
       externalPostId: null,
       error: null,
       retryCount: 0,
+      queuedAt: null,
+      publishingStartedAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -59,8 +63,20 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
     return rows[0] ? mapScheduledPost(rows[0]) : null;
   }
 
-  async findAll(): Promise<ScheduledPost[]> {
-    const rows = await this.db.select().from(scheduledPosts);
+  async findByUserId(userId: string): Promise<ScheduledPost[]> {
+    const rows = await this.db
+      .select({ post: scheduledPosts })
+      .from(scheduledPosts)
+      .innerJoin(contents, eq(scheduledPosts.contentId, contents.id))
+      .where(eq(contents.userId, userId));
+    return rows.map((row) => mapScheduledPost(row.post));
+  }
+
+  async findByContentId(contentId: string): Promise<ScheduledPost[]> {
+    const rows = await this.db
+      .select()
+      .from(scheduledPosts)
+      .where(eq(scheduledPosts.contentId, contentId));
     return rows.map(mapScheduledPost);
   }
 
@@ -88,14 +104,31 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
     return updated;
   }
 
-  async acquirePublishingLock(id: string): Promise<boolean> {
-    const now = new Date();
+  async claimForQueue(id: string, now: Date): Promise<boolean> {
     const result = await this.db
       .update(scheduledPosts)
-      .set({ status: 'publishing', updatedAt: now })
+      .set({ queuedAt: now, updatedAt: now })
       .where(
         and(
           eq(scheduledPosts.id, id),
+          inArray(scheduledPosts.status, ['scheduled', 'failed']),
+        ),
+      );
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async acquirePublishingLock(id: string, now: Date): Promise<boolean> {
+    const result = await this.db
+      .update(scheduledPosts)
+      .set({
+        status: 'publishing',
+        publishingStartedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(scheduledPosts.id, id),
+          isNull(scheduledPosts.externalPostId),
           or(eq(scheduledPosts.status, 'scheduled'), eq(scheduledPosts.status, 'failed')),
         ),
       );
@@ -120,6 +153,46 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
   }
 
   async markFailed(id: string, error: string): Promise<ScheduledPost> {
+    return this.setStatus(id, 'failed', error, true);
+  }
+
+  async markUncertain(id: string, error: string): Promise<ScheduledPost> {
+    return this.setStatus(id, 'uncertain', error, false);
+  }
+
+  async markDead(id: string, error: string): Promise<ScheduledPost> {
+    return this.setStatus(id, 'dead', error, false);
+  }
+
+  async reclaimStalePublishing(now: Date, leaseMs: number): Promise<number> {
+    const cutoff = new Date(now.getTime() - leaseMs);
+    const result = await this.db
+      .update(scheduledPosts)
+      .set({
+        status: 'failed',
+        error: 'Publishing lease expired',
+        retryCount: sql`${scheduledPosts.retryCount} + 1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(scheduledPosts.status, 'publishing'),
+          isNull(scheduledPosts.externalPostId),
+          or(
+            isNull(scheduledPosts.publishingStartedAt),
+            lte(scheduledPosts.publishingStartedAt, cutoff),
+          ),
+        ),
+      );
+    return result.meta?.changes ?? 0;
+  }
+
+  private async setStatus(
+    id: string,
+    status: ScheduledPostStatus,
+    error: string,
+    incrementRetry: boolean,
+  ): Promise<ScheduledPost> {
     const now = new Date();
     const existing = await this.findById(id);
     if (!existing) throw new Error(`ScheduledPost not found: ${id}`);
@@ -127,15 +200,15 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
     await this.db
       .update(scheduledPosts)
       .set({
-        status: 'failed',
+        status,
         error,
-        retryCount: existing.retryCount + 1,
+        retryCount: incrementRetry ? existing.retryCount + 1 : existing.retryCount,
         updatedAt: now,
       })
       .where(eq(scheduledPosts.id, id));
 
     const updated = await this.findById(id);
-    if (!updated) throw new Error(`ScheduledPost not found after failure: ${id}`);
+    if (!updated) throw new Error(`ScheduledPost not found after status change: ${id}`);
     return updated;
   }
 }

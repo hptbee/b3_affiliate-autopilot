@@ -1,14 +1,12 @@
 function generateId(): string {
   return crypto.randomUUID();
 }
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type {
   Content,
   ContentStatus,
   ContentType,
-  CreateContentInput,
-  UpdateContentInput,
   ContentRepository,
 } from '@social-autopilot/core';
 import { contents } from '../schema/index.js';
@@ -30,7 +28,12 @@ function mapContent(row: typeof contents.$inferSelect): Content {
 export class DrizzleContentRepository implements ContentRepository {
   constructor(private readonly db: DrizzleD1Database<typeof schema>) {}
 
-  async create(input: CreateContentInput): Promise<Content> {
+  async create(input: {
+    userId: string;
+    title: string;
+    body: string;
+    contentType?: ContentType;
+  }): Promise<Content> {
     const now = new Date();
     const row = {
       id: generateId(),
@@ -38,7 +41,7 @@ export class DrizzleContentRepository implements ContentRepository {
       title: input.title,
       body: input.body,
       status: 'draft' as const,
-      contentType: input.contentType ?? 'text',
+      contentType: input.contentType ?? 'video',
       createdAt: now,
       updatedAt: now,
     };
@@ -56,7 +59,10 @@ export class DrizzleContentRepository implements ContentRepository {
     return rows.map(mapContent);
   }
 
-  async update(id: string, input: UpdateContentInput): Promise<Content> {
+  async update(
+    id: string,
+    input: { title?: string; body?: string; contentType?: ContentType; status?: ContentStatus },
+  ): Promise<Content> {
     const now = new Date();
     await this.db
       .update(contents)

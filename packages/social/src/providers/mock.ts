@@ -1,25 +1,17 @@
-import type { SocialPlatform } from '@social-autopilot/core';
-import type { PublishPostInput, PublishPostResult, SocialPublisher } from '../types/index.js';
+import type { PublishPostInput, PublishPostResult, SocialPublisher } from '@social-autopilot/core';
 
 /**
- * Mock publisher for development and testing.
- * Does NOT call real social platform APIs.
+ * Mock TikTok publisher for development and tests.
+ * Does NOT call the TikTok API. Phase 1C will replace this with TikTokPublisher.
  */
-export class MockSocialPublisher implements SocialPublisher {
-  constructor(public readonly platform: SocialPlatform) {}
+export class MockTikTokPublisher implements SocialPublisher {
+  readonly platform = 'tiktok' as const;
 
   async publish(input: PublishPostInput): Promise<PublishPostResult> {
-    const externalPostId = `mock-${this.platform}-${input.content.id}-${Date.now()}`;
-
     return {
-      externalPostId,
-      platform: this.platform,
+      externalPostId: `mock-tiktok-${input.idempotencyKey}`,
+      platform: 'tiktok',
       publishedAt: new Date(),
     };
   }
-}
-
-export function createMockPublishers(): Map<SocialPlatform, SocialPublisher> {
-  const platforms: SocialPlatform[] = ['linkedin', 'x', 'facebook', 'instagram'];
-  return new Map(platforms.map((p) => [p, new MockSocialPublisher(p)]));
 }

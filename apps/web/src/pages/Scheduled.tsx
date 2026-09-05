@@ -23,8 +23,8 @@ export function ScheduledPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">Scheduled Posts</h2>
-        <p className="text-muted-foreground">View publishing schedule and status</p>
+        <h2 className="text-2xl font-bold">Scheduled TikTok Posts</h2>
+        <p className="text-muted-foreground">Publishing status lives on the job, not on Content</p>
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}

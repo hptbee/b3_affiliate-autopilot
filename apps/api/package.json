@@ -9,7 +9,8 @@
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@social-autopilot/ai": "workspace:*",
@@ -23,6 +24,7 @@
     "@cloudflare/workers-types": "^4.20250317.0",
     "@social-autopilot/config": "workspace:*",
     "typescript": "^5.8.2",
+    "vitest": "^3.0.9",
     "wrangler": "^4.1.0"
   }
 }

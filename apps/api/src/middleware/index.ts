@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { BOOTSTRAP_USER_ID } from '@social-autopilot/core';
 import type { HonoEnv } from '../lib/errors.js';
 import { createAppContext } from '../lib/context.js';
 
@@ -9,15 +10,26 @@ export const requestIdMiddleware = createMiddleware<HonoEnv>(async (c, next) => 
   await next();
 });
 
+/** Only place that sets the current user. Replace with session/JWT later. */
+export const userContextMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
+  c.set('user', { userId: BOOTSTRAP_USER_ID });
+  await next();
+});
+
 export const servicesMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
   c.set('services', createAppContext(c.env));
   await next();
 });
 
 export const corsMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
-  c.header('Access-Control-Allow-Origin', '*');
+  const allowed = c.env.CORS_ORIGIN ?? 'http://localhost:5173';
+  const origin = c.req.header('Origin');
+  if (!origin || origin === allowed) {
+    c.header('Access-Control-Allow-Origin', origin ?? allowed);
+  }
   c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-request-id');
+  c.header('Vary', 'Origin');
 
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204);
@@ -27,8 +39,8 @@ export const corsMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
 });
 
 /**
- * Basic rate limiting design: track requests per IP in memory.
- * For production, replace with Cloudflare Rate Limiting or Durable Objects.
+ * In-memory sketch only. Does not rate-limit across isolates.
+ * Replace with Cloudflare Rate Limiting before public exposure.
  */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;

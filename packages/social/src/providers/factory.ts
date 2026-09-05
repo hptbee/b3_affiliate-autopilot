@@ -1,10 +1,8 @@
-import type { SocialPlatform } from '@social-autopilot/core';
-import { MockSocialPublisher } from './mock.js';
-import type { SocialPublisher } from '../types/index.js';
+import type { SocialPlatform, SocialPublisher } from '@social-autopilot/core';
+import { MockTikTokPublisher } from './mock.js';
 
 export function createSocialPublishers(): Map<SocialPlatform, SocialPublisher> {
-  const platforms: SocialPlatform[] = ['linkedin', 'x', 'facebook', 'instagram'];
-  return new Map(platforms.map((p) => [p, new MockSocialPublisher(p)]));
+  return new Map([['tiktok', new MockTikTokPublisher()]]);
 }
 
 export * from './mock.js';

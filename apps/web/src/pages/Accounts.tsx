@@ -2,13 +2,6 @@ import { useEffect, useState } from 'react';
 import { Card, Badge } from '../components/ui';
 import { api, type SocialAccount } from '../lib/api';
 
-const platformLabels: Record<string, string> = {
-  linkedin: 'LinkedIn',
-  x: 'X (Twitter)',
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-};
-
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +16,8 @@ export function AccountsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">Social Accounts</h2>
-        <p className="text-muted-foreground">Connected social media accounts</p>
+        <h2 className="text-2xl font-bold">TikTok Account</h2>
+        <p className="text-muted-foreground">OAuth connection lands in Phase 1A. Tokens never appear here.</p>
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
@@ -32,7 +25,7 @@ export function AccountsPage() {
       {accounts.length === 0 ? (
         <Card>
           <p className="text-muted-foreground text-sm">
-            No accounts connected. OAuth integration coming in Phase 2.
+            No TikTok account connected yet. Use the local seed for a mock account.
           </p>
         </Card>
       ) : (
@@ -42,9 +35,7 @@ export function AccountsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium">{account.displayName}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {platformLabels[account.platform] ?? account.platform}
-                  </p>
+                  <p className="text-sm text-muted-foreground">TikTok</p>
                 </div>
                 <Badge variant={account.status === 'active' ? 'success' : 'default'}>
                   {account.status}

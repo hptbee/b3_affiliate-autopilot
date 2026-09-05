@@ -1,5 +1,9 @@
 import type { ScheduledPost } from '../domain/scheduled-post.js';
-import { MAX_PUBLISH_RETRIES } from '../domain/scheduled-post.js';
+import {
+  MAX_PUBLISH_RETRIES,
+  PUBLISHING_LEASE_MS,
+  QUEUE_CLAIM_TTL_MS,
+} from '../domain/scheduled-post.js';
 import type { Logger } from '../types/logger.js';
 import type { PublishQueue } from '../types/queue.js';
 import type { ScheduledPostRepository } from './scheduled-post-service.js';
@@ -11,18 +15,30 @@ export class SchedulerService {
     private readonly logger: Logger,
   ) {}
 
-  async processDuePosts(now: Date): Promise<{ enqueued: number; skipped: number }> {
+  async processDuePosts(now: Date): Promise<{ enqueued: number; skipped: number; reclaimed: number }> {
+    const reclaimed = await this.scheduledPostRepository.reclaimStalePublishing(
+      now,
+      PUBLISHING_LEASE_MS,
+    );
+
     const duePosts = await this.scheduledPostRepository.findDue(now);
     let enqueued = 0;
     let skipped = 0;
 
     for (const post of duePosts) {
       if (post.retryCount >= MAX_PUBLISH_RETRIES) {
-        this.logger.warn('Skipping post exceeding max retries', {
-          operation: 'scheduler.processDuePosts',
-          entityId: post.id,
-          status: post.status,
-        });
+        await this.scheduledPostRepository.markDead(post.id, 'Maximum publish retries exceeded');
+        skipped++;
+        continue;
+      }
+
+      if (post.queuedAt && now.getTime() - post.queuedAt.getTime() < QUEUE_CLAIM_TTL_MS) {
+        skipped++;
+        continue;
+      }
+
+      const claimed = await this.scheduledPostRepository.claimForQueue(post.id, now);
+      if (!claimed) {
         skipped++;
         continue;
       }
@@ -36,7 +52,7 @@ export class SchedulerService {
       });
     }
 
-    return { enqueued, skipped };
+    return { enqueued, skipped, reclaimed };
   }
 }
 

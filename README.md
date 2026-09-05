@@ -1,252 +1,188 @@
-# Social Autopilot
+# TikTok Autopilot
 
-Cloudflare-native AI social media automation platform. AI discovers topics, researches, generates content, validates, schedules, and publishes to social platforms.
+An AI-powered TikTok content automation platform built on Cloudflare.
 
-**Status:** v0.1 foundation — API, scheduling pipeline, mock publishers, minimal dashboard.
+**Status:** v0.1 foundation — TikTok-first domain, mock publisher, no live TikTok API yet.
 
-## Architecture
+## Product
 
-```mermaid
-flowchart TD
-    Web[React Dashboard]
-    API[Cloudflare Worker / Hono API]
-    D1[(Cloudflare D1)]
-    R2[(Cloudflare R2)]
-    Queue[Cloudflare Queue]
-    Cron[Cloudflare Cron]
-    Publisher[Publisher Worker]
-    Workflow[Workflow Worker]
-    AI[AI Providers]
-    Social[Social Platforms]
-
-    Web --> API
-    API --> D1
-    API --> R2
-    API --> AI
-    API --> Queue
-
-    Cron --> Scheduler[Scheduler Worker]
-    Scheduler --> D1
-    Scheduler --> Queue
-
-    Queue --> Publisher
-    Publisher --> Social
-    Publisher --> D1
-
-    Workflow -.-> AI
-    Workflow -.-> D1
+```text
+Topic / Idea
+    ↓
+AI Content Generation
+    ↓
+Draft
+    ↓
+Human Approval
+    ↓
+Schedule
+    ↓
+Cron
+    ↓
+Cloudflare Queue
+    ↓
+TikTok Publisher
+    ↓
+TikTok
+    ↓
+Published / Failed / Uncertain
 ```
 
-## Technology Stack
+TikTok is the only MVP destination. Other platforms may be added later; they are not in scope now.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React, TypeScript, Vite, Tailwind CSS |
-| API | Cloudflare Workers, Hono |
-| Database | Cloudflare D1, Drizzle ORM |
-| Storage | Cloudflare R2 |
-| Queue | Cloudflare Queues |
-| Scheduling | Cloudflare Cron Triggers |
-| Workflows | Cloudflare Workflows (stub) |
-| AI | OpenAI, Cloudflare Workers AI |
-| Validation | Zod |
-| Testing | Vitest |
-| Monorepo | pnpm, Turborepo |
+## MVP
 
-## Project Structure
+1. Create content
+2. Generate TikTok content with AI
+3. Human approval
+4. Upload video (R2)
+5. Connect TikTok account
+6. Schedule TikTok post
+7. Cron discovers due posts
+8. Queue publishing job
+9. Publisher publishes to TikTok
+10. Persist publishing result
+11. Handle failed / uncertain publishing without duplicate posts
 
+This repo is **not** at MVP yet. Next implementation step is **Phase 1A: TikTok OAuth**.
+
+## Cloudflare architecture
+
+```text
+React Dashboard
+      ↓
+Cloudflare Worker + Hono   (target: fetch + scheduled + queue in one Worker)
+      ↓
+D1 ──────────────── R2
+ │                   │
+ │                   └── Video assets
+ │
+ └── Content / Posts / Accounts / encrypted token refs
+
+Cron
+  ↓
+Queue
+  ↓
+Publisher
+  ↓
+TikTok API
+
+AI
+  ↓
+Workers AI / OpenAI
 ```
-social-autopilot/
-├── apps/
-│   ├── api/          # Hono REST API worker
-│   └── web/          # React dashboard
-├── packages/
-│   ├── core/         # Domain + application services
-│   ├── ai/           # AI providers, agents, tools
-│   ├── social/       # Social publisher abstractions
-│   ├── database/     # Drizzle schema, repositories
-│   └── config/       # Shared TypeScript configs
-├── workers/
-│   ├── scheduler/    # Cron → find due posts → enqueue
-│   ├── publisher/    # Queue consumer → publish
-│   └── workflow/     # Long-running workflows (stub)
-├── scripts/          # Seed data, utilities
-└── docs/             # Architecture docs
-```
 
-## Local Setup
+| Service | Role |
+|---------|------|
+| Workers | HTTP API; target also Cron + Queue consumer |
+| D1 | Users, content, scheduled posts, account metadata, token *refs* |
+| R2 | Video binaries (metadata stays in D1) |
+| Queues | `{ scheduledPostId }` publish jobs |
+| Cron | Find due posts, claim `queuedAt`, enqueue |
+| Worker Secrets | `OPENAI_API_KEY`, later TikTok client secret + `TOKEN_WRAP_KEY` |
+| Workers AI | Default generate in development |
+| OpenAI | Optional structured-generation provider |
 
-### Prerequisites
+Do **not** introduce Redis, PostgreSQL, Temporal, SQS, Durable Objects, Kubernetes, or extra microservices.
 
-- Node.js 20+
-- pnpm 9+
-- Cloudflare account (for deployment)
+Today `workers/scheduler` and `workers/publisher` still exist as separate Wrangler projects. **Target:** fold Cron and Queue handlers into `apps/api`. Do not add more Workers.
 
-### Install
+## Domain
+
+**Content** (creative artifact): `draft → approved → archived | cancelled`  
+Publishing status does **not** live here.
+
+**ScheduledPost** (TikTok job): `scheduled → publishing → published`  
+Failures: `publishing → failed` (retryable) or `uncertain` (do not retry) or `dead`.
+
+Scheduling requires `Content.status === approved`.
+
+## Local setup
+
+Prerequisites: Node.js 20+, pnpm 9+.
 
 ```bash
 pnpm install
-```
 
-### Database (local D1)
-
-```bash
-# Apply migrations locally
 cd apps/api
 pnpm wrangler d1 migrations apply social-autopilot-db --local
-
-# Seed development data
 pnpm wrangler d1 execute social-autopilot-db --local --file=../../scripts/seed.sql
+cd ../..
+
+pnpm cf:dev
+pnpm --filter @social-autopilot/web dev
 ```
 
-### Environment
-
-```bash
-cp .env.example .env
-```
-
-For OpenAI in local dev, create `apps/api/.dev.vars`:
+Optional `apps/api/.dev.vars`:
 
 ```
 OPENAI_API_KEY=sk-your-key
 AI_PROVIDER=openai
 ```
 
-### Run
-
-```bash
-# API worker (port 8787)
-pnpm cf:dev
-
-# Web dashboard (port 5173) — in another terminal
-pnpm --filter @social-autopilot/web dev
-```
-
-## Cloudflare Setup
-
-### 1. Create D1 Database
+## Cloudflare setup
 
 ```bash
 wrangler d1 create social-autopilot-db
-# Copy database_id into apps/api/wrangler.jsonc and workers/*/wrangler.jsonc
-```
-
-### 2. Create R2 Bucket
-
-```bash
 wrangler r2 bucket create social-autopilot-media
-```
-
-### 3. Create Queues
-
-```bash
 wrangler queues create social-autopilot-publish
 wrangler queues create social-autopilot-publish-dlq
-```
-
-### 4. Apply Migrations (remote)
-
-```bash
 cd apps/api
 wrangler d1 migrations apply social-autopilot-db --remote
-```
-
-### 5. Set Secrets
-
-```bash
 wrangler secret put OPENAI_API_KEY --env production
 ```
 
-### 6. Deploy
+Fill real `database_id` values in `wrangler.jsonc`. Resources are not created automatically.
 
-```bash
-pnpm cf:deploy
-# Or deploy individually:
-pnpm --filter @social-autopilot/api cf:deploy
-pnpm --filter @social-autopilot/scheduler cf:deploy
-pnpm --filter @social-autopilot/publisher cf:deploy
-```
-
-## AI Provider Configuration
-
-Set `AI_PROVIDER` environment variable:
-
-| Value | Description |
-|-------|-------------|
-| `workers-ai` | Uses Cloudflare Workers AI binding (default for dev) |
-| `openai` | Uses OpenAI API (requires `OPENAI_API_KEY` secret) |
-
-## API Endpoints
+## API
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| GET | `/api/content` | List content |
+| GET | `/api/content` | List current user's content |
 | POST | `/api/content` | Create draft |
-| GET | `/api/content/:id` | Get content |
-| PATCH | `/api/content/:id` | Update content |
+| GET | `/api/content/:id` | Get content (owner only) |
+| PATCH | `/api/content/:id` | Update draft copy (no status) |
+| POST | `/api/content/:id/approve` | Approve draft |
+| POST | `/api/content/:id/cancel` | Cancel content |
 | DELETE | `/api/content/:id` | Delete content |
-| GET | `/api/scheduled-posts` | List scheduled posts |
-| POST | `/api/scheduled-posts` | Schedule a post |
-| POST | `/api/scheduled-posts/:id/cancel` | Cancel scheduled post |
-| GET | `/api/social-accounts` | List social accounts |
+| GET | `/api/scheduled-posts` | List current user's jobs |
+| POST | `/api/scheduled-posts` | Schedule approved content |
+| POST | `/api/scheduled-posts/:id/cancel` | Cancel job |
+| GET | `/api/social-accounts` | List TikTok accounts (no tokens) |
 
-## Development Commands
+`userId` is never taken from the request body. `UserContext` is set in middleware (bootstrap user today).
+
+## Commands
 
 ```bash
-pnpm dev          # Start all dev servers (turbo)
-pnpm build        # Build all packages
-pnpm test         # Run all tests
-pnpm lint         # Typecheck all packages
-pnpm typecheck    # Typecheck all packages
-pnpm db:generate  # Generate Drizzle migrations
-pnpm db:migrate   # Apply Drizzle migrations
-pnpm cf:dev       # Start API worker locally
-pnpm cf:deploy    # Deploy all workers
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm cf:dev
 ```
 
 ## Testing
 
-```bash
-pnpm test
-```
-
-Tests cover:
-- Content creation and status transitions
-- Scheduling validation
-- Publisher idempotency
-- Scheduler due-post filtering
-- Mock AI and social providers
-
-## Deployment
-
-Deploy order:
-1. Create Cloudflare resources (D1, R2, Queues)
-2. Update `database_id` placeholders in wrangler configs
-3. Apply migrations
-4. Deploy workers: API → Scheduler → Publisher → Workflow
+Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, owner scoping, publish idempotency, uncertain/dead outcomes, and mock TikTok publisher. No live TikTok or AI calls.
 
 ## Roadmap
 
-### Phase 2
-- LinkedIn, X, Facebook/Instagram OAuth
-- Real publishing APIs
-- Media upload to R2
-- Content calendar UI
+See [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md).
 
-### Phase 3
-- AI content generation pipeline
-- Topic research, content scoring
-- Image generation, brand voice
+- **Phase 0** — Architecture hardening (in progress in this codebase)
+- **Phase 1** — TikTok MVP (OAuth, R2 video, publisher, schedule E2E)
+- **Phase 2** — TikTok AI drafts
+- **Phase 3** — AI video pipeline
+- **Phase 4** — Research
+- **Phase 5** — Autonomous agent
+- **Phase 6** — MCP
+- **Phase 7** — Analytics
 
-### Phase 4
-- Autonomous AI agent with tool loop
-- MCP server integration
-- Analytics and optimization
+## Out of MVP
 
-### Phase 5
-- Multi-user, teams, roles
-- Billing
+LinkedIn, X, Meta, Instagram, IdP, teams, billing, autonomous publish, MCP, analytics, AI video generation, Redis, Postgres, Temporal, Durable Objects, extra services.
 
 ## License
 

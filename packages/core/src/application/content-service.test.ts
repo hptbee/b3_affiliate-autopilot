@@ -7,6 +7,9 @@ import {
 import { ContentService, type ContentRepository } from '../application/content-service.js';
 import { ConflictError } from '../types/errors.js';
 
+const user = { userId: 'user-1' };
+const other = { userId: 'user-2' };
+
 function createMockContent(overrides: Partial<Content> = {}): Content {
   return {
     id: 'content-1',
@@ -14,16 +17,14 @@ function createMockContent(overrides: Partial<Content> = {}): Content {
     title: 'Test Title',
     body: 'Test body content',
     status: 'draft',
-    contentType: 'text',
+    contentType: 'video',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
   };
 }
 
-function createMockRepository(
-  content: Content = createMockContent(),
-): ContentRepository {
+function createMockRepository(content: Content = createMockContent()): ContentRepository {
   const store = new Map([[content.id, { ...content }]]);
 
   return {
@@ -33,7 +34,7 @@ function createMockRepository(
         userId: input.userId,
         title: input.title,
         body: input.body,
-        contentType: input.contentType ?? 'text',
+        contentType: input.contentType ?? 'video',
       });
       store.set(created.id, created);
       return created;
@@ -58,57 +59,59 @@ function createMockRepository(
 }
 
 describe('Content domain', () => {
-  it('allows valid status transitions', () => {
+  it('allows draft → approved and approved → cancelled', () => {
     expect(canTransitionContentStatus('draft', 'approved')).toBe(true);
-    expect(canTransitionContentStatus('approved', 'scheduled')).toBe(true);
-    expect(canTransitionContentStatus('publishing', 'published')).toBe(true);
+    expect(canTransitionContentStatus('approved', 'cancelled')).toBe(true);
+    expect(canTransitionContentStatus('approved', 'archived')).toBe(true);
   });
 
-  it('rejects invalid status transitions', () => {
-    expect(canTransitionContentStatus('published', 'draft')).toBe(false);
+  it('rejects publishing statuses on Content', () => {
+    expect(canTransitionContentStatus('draft', 'published' as ContentStatus)).toBe(false);
+    expect(canTransitionContentStatus('approved', 'scheduled' as ContentStatus)).toBe(false);
     expect(canTransitionContentStatus('cancelled', 'approved')).toBe(false);
   });
 });
 
 describe('ContentService', () => {
-  it('creates content with validation', async () => {
+  it('creates content as draft video', async () => {
     const service = new ContentService(createMockRepository());
-    const content = await service.create({
-      userId: 'user-1',
-      title: 'Hello',
-      body: 'World',
+    const content = await service.create(user, {
+      title: 'Hook',
+      body: 'Script',
     });
-    expect(content.title).toBe('Hello');
+    expect(content.title).toBe('Hook');
     expect(content.status).toBe('draft');
+    expect(content.contentType).toBe('video');
   });
 
   it('rejects empty title', async () => {
     const service = new ContentService(createMockRepository());
-    await expect(
-      service.create({ userId: 'user-1', title: '  ', body: 'body' }),
-    ).rejects.toThrow('Title is required');
+    await expect(service.create(user, { title: '  ', body: 'body' })).rejects.toThrow(
+      'Title is required',
+    );
   });
 
-  it('rejects invalid status transition', async () => {
-    const content = createMockContent({ status: 'published' });
+  it('approves draft content', async () => {
+    const service = new ContentService(createMockRepository());
+    const approved = await service.approve(user, 'content-1');
+    expect(approved.status).toBe('approved');
+  });
+
+  it('cannot update non-draft content', async () => {
+    const content = createMockContent({ status: 'approved' });
     const service = new ContentService(createMockRepository(content));
-    await expect(service.update('content-1', { status: 'draft' })).rejects.toThrow(
+    await expect(service.update(user, 'content-1', { title: 'Nope' })).rejects.toThrow(
       ConflictError,
     );
   });
-});
 
-describe('Content status transitions', () => {
-  const validPaths: Array<[ContentStatus, ContentStatus]> = [
-    ['draft', 'approved'],
-    ['approved', 'scheduled'],
-    ['scheduled', 'publishing'],
-    ['publishing', 'published'],
-    ['publishing', 'failed'],
-    ['failed', 'draft'],
-  ];
+  it('does not expose another user\'s content', async () => {
+    const service = new ContentService(createMockRepository());
+    await expect(service.getById(other, 'content-1')).rejects.toThrow('Content not found');
+  });
 
-  it.each(validPaths)('allows %s -> %s', (from, to) => {
-    expect(canTransitionContentStatus(from, to)).toBe(true);
+  it('does not allow another user to approve', async () => {
+    const service = new ContentService(createMockRepository());
+    await expect(service.approve(other, 'content-1')).rejects.toThrow('Content not found');
   });
 });

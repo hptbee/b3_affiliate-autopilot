@@ -6,4 +6,5 @@ export interface Env {
   ENVIRONMENT: string;
   AI_PROVIDER: string;
   OPENAI_API_KEY?: string;
+  CORS_ORIGIN?: string;
 }

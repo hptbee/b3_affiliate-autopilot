@@ -3,9 +3,9 @@ import { Card, CardHeader, CardTitle, Badge, Button, Input, Textarea } from '../
 import { api, type Content } from '../lib/api';
 
 function statusVariant(status: string) {
-  if (status === 'published') return 'success' as const;
-  if (status === 'failed') return 'destructive' as const;
-  if (status === 'scheduled') return 'warning' as const;
+  if (status === 'approved') return 'success' as const;
+  if (status === 'cancelled') return 'destructive' as const;
+  if (status === 'draft') return 'warning' as const;
   return 'default' as const;
 }
 
@@ -46,8 +46,8 @@ export function ContentPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">Content</h2>
-        <p className="text-muted-foreground">Create and manage content drafts</p>
+        <h2 className="text-2xl font-bold">TikTok Content</h2>
+        <p className="text-muted-foreground">Drafts must be approved before they can be scheduled</p>
       </div>
 
       <Card>
@@ -56,13 +56,13 @@ export function ContentPage() {
         </CardHeader>
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
-            placeholder="Title"
+            placeholder="Hook"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
           />
           <Textarea
-            placeholder="Write your post content..."
+            placeholder="Script and caption..."
             value={body}
             onChange={(e) => setBody(e.target.value)}
             required
@@ -81,7 +81,7 @@ export function ContentPage() {
         ) : (
           items.map((item) => (
             <Card key={item.id}>
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-4">
                 <div>
                   <h4 className="font-medium">{item.title}</h4>
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.body}</p>
@@ -89,7 +89,22 @@ export function ContentPage() {
                     {new Date(item.createdAt).toLocaleString()}
                   </p>
                 </div>
-                <Badge variant={statusVariant(item.status)}>{item.status}</Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant={statusVariant(item.status)}>{item.status}</Badge>
+                  {item.status === 'draft' && (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        api
+                          .approveContent(item.id)
+                          .then(() => load())
+                          .catch((e) => setError(e.message))
+                      }
+                    >
+                      Approve
+                    </Button>
+                  )}
+                </div>
               </div>
             </Card>
           ))

@@ -8,6 +8,8 @@ export * from './types/errors.js';
 export * from './types/logger.js';
 export * from './types/media-storage.js';
 export * from './types/queue.js';
+export * from './types/user-context.js';
+export * from './types/token-store.js';
 
 export * from './application/content-service.js';
 export * from './application/scheduled-post-service.js';

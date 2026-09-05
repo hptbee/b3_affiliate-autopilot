@@ -13,6 +13,8 @@ import { filterDuePosts } from '../application/scheduler-service.js';
 
 const future = new Date(Date.now() + 86_400_000);
 const past = new Date(Date.now() - 86_400_000);
+const user = { userId: 'user-1' };
+const other = { userId: 'user-2' };
 
 function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledPost {
   return {
@@ -25,6 +27,8 @@ function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledP
     externalPostId: null,
     error: null,
     retryCount: 0,
+    queuedAt: null,
+    publishingStartedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -38,18 +42,18 @@ function createContent(overrides: Partial<Content> = {}): Content {
     title: 'Title',
     body: 'Body',
     status: 'approved',
-    contentType: 'text',
+    contentType: 'video',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
   };
 }
 
-function createAccount(): SocialAccount {
+function createAccount(overrides: Partial<SocialAccount> = {}): SocialAccount {
   return {
     id: 'account-1',
     userId: 'user-1',
-    platform: 'linkedin',
+    platform: 'tiktok',
     externalAccountId: 'ext-1',
     displayName: 'Test Account',
     accessTokenRef: 'token-ref',
@@ -59,29 +63,37 @@ function createAccount(): SocialAccount {
     status: 'active',
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...overrides,
   };
 }
 
 function createServices(
   content = createContent(),
   scheduledPost = createScheduledPost(),
+  account = createAccount(),
 ) {
   const scheduledPosts = new Map([[scheduledPost.id, { ...scheduledPost }]]);
+  const extraPosts: ScheduledPost[] = [];
 
   const scheduledPostRepository: ScheduledPostRepository = {
     async create(input) {
       const post = createScheduledPost({
-        id: 'post-new',
+        id: `post-new-${scheduledPosts.size}`,
         ...input,
       });
       scheduledPosts.set(post.id, post);
+      extraPosts.push(post);
       return post;
     },
     async findById(id) {
-      return scheduledPosts.get(id) ?? null;
+      return scheduledPosts.get(id) ?? extraPosts.find((p) => p.id === id) ?? null;
     },
-    async findAll() {
+    async findByUserId(userId) {
+      if (content.userId !== userId) return [];
       return [...scheduledPosts.values()];
+    },
+    async findByContentId(contentId) {
+      return [...scheduledPosts.values()].filter((p) => p.contentId === contentId);
     },
     async findDue(date) {
       return [...scheduledPosts.values()].filter(
@@ -95,6 +107,9 @@ function createServices(
       const updated = { ...post, status: 'cancelled' as const };
       scheduledPosts.set(id, updated);
       return updated;
+    },
+    async claimForQueue() {
+      return true;
     },
     async acquirePublishingLock() {
       return true;
@@ -121,6 +136,21 @@ function createServices(
       scheduledPosts.set(id, updated);
       return updated;
     },
+    async markUncertain(id, error) {
+      const post = scheduledPosts.get(id)!;
+      const updated = { ...post, status: 'uncertain' as const, error };
+      scheduledPosts.set(id, updated);
+      return updated;
+    },
+    async markDead(id, error) {
+      const post = scheduledPosts.get(id)!;
+      const updated = { ...post, status: 'dead' as const, error };
+      scheduledPosts.set(id, updated);
+      return updated;
+    },
+    async reclaimStalePublishing() {
+      return 0;
+    },
   };
 
   const contentStore = new Map([[content.id, { ...content }]]);
@@ -145,10 +175,10 @@ function createServices(
 
   const socialAccountRepository: SocialAccountRepository = {
     async findById() {
-      return createAccount();
+      return account;
     },
     async findByUserId() {
-      return [createAccount()];
+      return [account];
     },
   };
 
@@ -166,7 +196,7 @@ function createServices(
 describe('ScheduledPostService', () => {
   it('creates a scheduled post for approved content', async () => {
     const { service } = createServices();
-    const post = await service.create({
+    const post = await service.create(user, {
       contentId: 'content-1',
       socialAccountId: 'account-1',
       scheduledAt: future,
@@ -174,10 +204,21 @@ describe('ScheduledPostService', () => {
     expect(post.status).toBe('scheduled');
   });
 
+  it('cannot schedule draft content', async () => {
+    const { service } = createServices(createContent({ status: 'draft' }));
+    await expect(
+      service.create(user, {
+        contentId: 'content-1',
+        socialAccountId: 'account-1',
+        scheduledAt: future,
+      }),
+    ).rejects.toThrow(ConflictError);
+  });
+
   it('cannot schedule cancelled content', async () => {
     const { service } = createServices(createContent({ status: 'cancelled' }));
     await expect(
-      service.create({
+      service.create(user, {
         contentId: 'content-1',
         socialAccountId: 'account-1',
         scheduledAt: future,
@@ -188,7 +229,7 @@ describe('ScheduledPostService', () => {
   it('cannot schedule in the past', async () => {
     const { service } = createServices();
     await expect(
-      service.create({
+      service.create(user, {
         contentId: 'content-1',
         socialAccountId: 'account-1',
         scheduledAt: past,
@@ -201,18 +242,55 @@ describe('ScheduledPostService', () => {
       createContent(),
       createScheduledPost({ status: 'published' }),
     );
-    await expect(service.cancel('post-1')).rejects.toThrow(ConflictError);
+    await expect(service.cancel(user, 'post-1')).rejects.toThrow(ConflictError);
+  });
+
+  it('does not schedule using another user\'s account', async () => {
+    const { service } = createServices(
+      createContent(),
+      createScheduledPost(),
+      createAccount({ userId: 'user-2' }),
+    );
+    await expect(
+      service.create(user, {
+        contentId: 'content-1',
+        socialAccountId: 'account-1',
+        scheduledAt: future,
+      }),
+    ).rejects.toThrow('SocialAccount not found');
+  });
+
+  it('does not let another user read a scheduled post', async () => {
+    const { service } = createServices();
+    await expect(service.getById(other, 'post-1')).rejects.toThrow('ScheduledPost not found');
+  });
+
+  it('allows multiple scheduled posts for the same content', async () => {
+    const { service } = createServices();
+    const first = await service.create(user, {
+      contentId: 'content-1',
+      socialAccountId: 'account-1',
+      scheduledAt: future,
+    });
+    const second = await service.create(user, {
+      contentId: 'content-1',
+      socialAccountId: 'account-1',
+      scheduledAt: new Date(future.getTime() + 60_000),
+    });
+    expect(first.id).not.toBe(second.id);
+    expect(first.contentId).toBe(second.contentId);
   });
 });
 
 describe('Scheduler filtering', () => {
   const now = new Date('2026-01-15T12:00:00Z');
-  const future = new Date('2026-01-16T12:00:00Z');
-  const past = new Date('2026-01-14T12:00:00Z');
+  const futureDate = new Date('2026-01-16T12:00:00Z');
+  const pastDate = new Date('2026-01-14T12:00:00Z');
+
   it('finds due posts', () => {
     const posts = [
-      createScheduledPost({ id: '1', scheduledAt: past, status: 'scheduled' }),
-      createScheduledPost({ id: '2', scheduledAt: future, status: 'scheduled' }),
+      createScheduledPost({ id: '1', scheduledAt: pastDate, status: 'scheduled' }),
+      createScheduledPost({ id: '2', scheduledAt: futureDate, status: 'scheduled' }),
     ];
     const due = filterDuePosts(posts, now);
     expect(due).toHaveLength(1);
@@ -221,7 +299,7 @@ describe('Scheduler filtering', () => {
 
   it('ignores already published posts', () => {
     const posts = [
-      createScheduledPost({ id: '1', scheduledAt: past, status: 'published' }),
+      createScheduledPost({ id: '1', scheduledAt: pastDate, status: 'published' }),
     ];
     const due = filterDuePosts(posts, now);
     expect(due).toHaveLength(0);
@@ -229,7 +307,15 @@ describe('Scheduler filtering', () => {
 
   it('ignores future posts', () => {
     const posts = [
-      createScheduledPost({ id: '1', scheduledAt: future, status: 'scheduled' }),
+      createScheduledPost({ id: '1', scheduledAt: futureDate, status: 'scheduled' }),
+    ];
+    const due = filterDuePosts(posts, now);
+    expect(due).toHaveLength(0);
+  });
+
+  it('ignores uncertain posts', () => {
+    const posts = [
+      createScheduledPost({ id: '1', scheduledAt: pastDate, status: 'uncertain' }),
     ];
     const due = filterDuePosts(posts, now);
     expect(due).toHaveLength(0);

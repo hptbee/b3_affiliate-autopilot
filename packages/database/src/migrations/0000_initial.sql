@@ -30,7 +30,7 @@ CREATE TABLE `contents` (
 	`title` text NOT NULL,
 	`body` text NOT NULL,
 	`status` text DEFAULT 'draft' NOT NULL,
-	`content_type` text DEFAULT 'text' NOT NULL,
+	`content_type` text DEFAULT 'video' NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action

@@ -1,30 +1,23 @@
-import { z } from 'zod';
-import type { ContentService } from '@social-autopilot/core';
+import type { ContentService, UserContext } from '@social-autopilot/core';
 import type { AIProvider } from '../providers/types.js';
-import { CONTENT_DRAFT_SYSTEM_PROMPT } from '../prompts/content.js';
-import type { AgentContext, AgentResult } from './types.js';
-
-const draftSchema = z.object({
-  title: z.string(),
-  body: z.string(),
-});
+import { TIKTOK_DRAFT_SYSTEM_PROMPT } from '../prompts/content.js';
+import { tiktokContentDraftSchema } from '../prompts/tiktok-draft.js';
+import type { AgentResult } from './types.js';
 
 export interface GenerateDraftInput {
   topic: string;
   tone?: string;
-  platform?: string;
 }
 
 export interface GenerateDraftOutput {
   title: string;
   body: string;
   contentId: string;
+  qualityScore: number;
 }
 
 /**
- * Simple deterministic content agent that uses AI to generate a draft
- * and persists it via ContentService. No autonomous loop — designed for
- * future MCP/tool integration.
+ * Deterministic TikTok draft generator. No tool loop.
  */
 export class ContentAgent {
   constructor(
@@ -33,28 +26,29 @@ export class ContentAgent {
   ) {}
 
   async generateDraft(
-    context: AgentContext,
+    user: UserContext,
     input: GenerateDraftInput,
   ): Promise<AgentResult<GenerateDraftOutput>> {
     try {
-      const prompt = [
-        `Topic: ${input.topic}`,
-        input.tone ? `Tone: ${input.tone}` : '',
-        input.platform ? `Target platform: ${input.platform}` : '',
-      ]
+      const prompt = [`Topic: ${input.topic}`, input.tone ? `Tone: ${input.tone}` : '']
         .filter(Boolean)
         .join('\n');
 
       const draft = await this.aiProvider.generateStructured({
         prompt,
-        systemPrompt: CONTENT_DRAFT_SYSTEM_PROMPT,
-        schema: draftSchema,
+        systemPrompt: TIKTOK_DRAFT_SYSTEM_PROMPT,
+        schema: tiktokContentDraftSchema,
       });
 
-      const content = await this.contentService.create({
-        userId: context.userId,
-        title: draft.title,
-        body: draft.body,
+      const title = draft.hook;
+      const body = [draft.script, draft.caption, draft.cta, (draft.hashtags ?? []).join(' ')]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const content = await this.contentService.create(user, {
+        title,
+        body,
+        contentType: 'video',
       });
 
       return {
@@ -63,6 +57,7 @@ export class ContentAgent {
           title: content.title,
           body: content.body,
           contentId: content.id,
+          qualityScore: draft.qualityScore,
         },
       };
     } catch (error) {

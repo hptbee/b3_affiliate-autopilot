@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Content } from '../domain/content.js';
-import type { ScheduledPost } from '../domain/scheduled-post.js';
+import { isStalePublishing, type ScheduledPost } from '../domain/scheduled-post.js';
 import type { SocialAccount } from '../domain/social-account.js';
 import {
   PublishingService,
@@ -12,6 +12,7 @@ import type {
   ScheduledPostRepository,
   SocialAccountRepository,
 } from '../application/scheduled-post-service.js';
+import { SocialPublishError } from '../types/errors.js';
 import { createLogger } from '../types/logger.js';
 
 function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledPost {
@@ -25,6 +26,8 @@ function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledP
     externalPostId: null,
     error: null,
     retryCount: 0,
+    queuedAt: null,
+    publishingStartedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -37,8 +40,8 @@ function createContent(): Content {
     userId: 'user-1',
     title: 'Title',
     body: 'Body',
-    status: 'scheduled',
-    contentType: 'text',
+    status: 'approved',
+    contentType: 'video',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -48,7 +51,7 @@ function createAccount(): SocialAccount {
   return {
     id: 'account-1',
     userId: 'user-1',
-    platform: 'linkedin',
+    platform: 'tiktok',
     externalAccountId: 'ext-1',
     displayName: 'Test',
     accessTokenRef: 'token-ref',
@@ -61,6 +64,41 @@ function createAccount(): SocialAccount {
   };
 }
 
+function emptyRepoMethods(): Pick<
+  ScheduledPostRepository,
+  | 'create'
+  | 'findByUserId'
+  | 'findByContentId'
+  | 'findDue'
+  | 'cancel'
+  | 'claimForQueue'
+  | 'reclaimStalePublishing'
+> {
+  return {
+    async create() {
+      throw new Error('not implemented');
+    },
+    async findByUserId() {
+      return [];
+    },
+    async findByContentId() {
+      return [];
+    },
+    async findDue() {
+      return [];
+    },
+    async cancel() {
+      throw new Error('not implemented');
+    },
+    async claimForQueue() {
+      return true;
+    },
+    async reclaimStalePublishing() {
+      return 0;
+    },
+  };
+}
+
 function createPublishingService(options: {
   post?: ScheduledPost;
   acquireLock?: boolean;
@@ -70,30 +108,20 @@ function createPublishingService(options: {
   let post = options.post ?? createScheduledPost();
   const content = createContent();
   const account = createAccount();
+  const contentUpdates: Array<{ status?: string }> = [];
 
   const scheduledPostRepository: ScheduledPostRepository = {
+    ...emptyRepoMethods(),
     async findById() {
       return post;
-    },
-    async create() {
-      throw new Error('not implemented');
-    },
-    async findAll() {
-      return [post];
-    },
-    async findDue() {
-      return [];
-    },
-    async cancel() {
-      throw new Error('not implemented');
     },
     async acquirePublishingLock() {
       if (post.status === 'publishing') return false;
       if (options.acquireLock === false) return false;
-      post = { ...post, status: 'publishing' };
+      post = { ...post, status: 'publishing', publishingStartedAt: new Date() };
       return true;
     },
-    async markPublished(id, externalPostId) {
+    async markPublished(_id, externalPostId) {
       post = {
         ...post,
         status: 'published',
@@ -102,13 +130,21 @@ function createPublishingService(options: {
       };
       return post;
     },
-    async markFailed(id, error) {
+    async markFailed(_id, error) {
       post = {
         ...post,
         status: 'failed',
         error,
         retryCount: post.retryCount + 1,
       };
+      return post;
+    },
+    async markUncertain(_id, error) {
+      post = { ...post, status: 'uncertain', error };
+      return post;
+    },
+    async markDead(_id, error) {
+      post = { ...post, status: 'dead', error };
       return post;
     },
   };
@@ -123,7 +159,8 @@ function createPublishingService(options: {
     async findByUserId() {
       return [content];
     },
-    async update(id, input) {
+    async update(_id, input) {
+      contentUpdates.push(input);
       return { ...content, ...input };
     },
     async delete() {},
@@ -139,13 +176,13 @@ function createPublishingService(options: {
   };
 
   const mockPublisher: SocialPublisher = {
-    platform: 'linkedin',
-    publish: vi.fn(async () => {
+    platform: 'tiktok',
+    publish: vi.fn(async (): Promise<PublishPostResult> => {
       if (options.publishError) throw options.publishError;
       return (
         options.publishResult ?? {
           externalPostId: 'ext-post-1',
-          platform: 'linkedin',
+          platform: 'tiktok',
           publishedAt: new Date(),
         }
       );
@@ -156,25 +193,26 @@ function createPublishingService(options: {
     scheduledPostRepository,
     contentRepository,
     socialAccountRepository,
-    new Map([['linkedin', mockPublisher]]),
+    new Map([['tiktok', mockPublisher]]),
     createLogger('test'),
   );
 
-  return { service, mockPublisher, getPost: () => post };
+  return { service, mockPublisher, getPost: () => post, contentUpdates };
 }
 
 describe('PublishingService', () => {
-  it('publishes successfully', async () => {
-    const { service, mockPublisher } = createPublishingService({});
+  it('publishes successfully without changing Content status', async () => {
+    const { service, mockPublisher, contentUpdates } = createPublishingService({});
     const result = await service.publishScheduledPost('post-1');
     expect(result?.externalPostId).toBe('ext-post-1');
     expect(mockPublisher.publish).toHaveBeenCalledOnce();
+    expect(contentUpdates).toHaveLength(0);
   });
 
-  it('skips already published post (idempotency)', async () => {
+  it('skips when externalPostId already exists', async () => {
     const { service, mockPublisher } = createPublishingService({
       post: createScheduledPost({
-        status: 'published',
+        status: 'failed',
         externalPostId: 'already-published',
         publishedAt: new Date(),
       }),
@@ -194,10 +232,52 @@ describe('PublishingService', () => {
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 
-  it('handles publish failure and marks post as failed', async () => {
-    const { service } = createPublishingService({
-      publishError: new Error('Network timeout'),
+  it('marks retryable failures as failed', async () => {
+    const { service, getPost } = createPublishingService({
+      publishError: new SocialPublishError('Rate limited', 'failed'),
     });
-    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Network timeout');
+    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Rate limited');
+    expect(getPost().status).toBe('failed');
+  });
+
+  it('marks ambiguous provider errors as uncertain', async () => {
+    const { service, getPost } = createPublishingService({
+      publishError: new SocialPublishError('Timeout after send', 'uncertain'),
+    });
+    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Timeout after send');
+    expect(getPost().status).toBe('uncertain');
+  });
+
+  it('marks permanent errors as dead', async () => {
+    const { service, getPost } = createPublishingService({
+      publishError: new SocialPublishError('Video rejected', 'dead'),
+    });
+    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Video rejected');
+    expect(getPost().status).toBe('dead');
+  });
+
+  it('does not retry uncertain posts', async () => {
+    const { service, mockPublisher } = createPublishingService({
+      post: createScheduledPost({ status: 'uncertain' }),
+    });
+    const result = await service.publishScheduledPost('post-1');
+    expect(result).toBeNull();
+    expect(mockPublisher.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('publishing lease', () => {
+  it('treats publishing without a start time as stale', () => {
+    const post = createScheduledPost({ status: 'publishing', publishingStartedAt: null });
+    expect(isStalePublishing(post, new Date())).toBe(true);
+  });
+
+  it('does not reclaim publishing that has an externalPostId', () => {
+    const post = createScheduledPost({
+      status: 'publishing',
+      publishingStartedAt: new Date(Date.now() - 60 * 60 * 1000),
+      externalPostId: 'ext',
+    });
+    expect(isStalePublishing(post, new Date())).toBe(false);
   });
 });

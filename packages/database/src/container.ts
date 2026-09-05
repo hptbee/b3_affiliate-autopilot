@@ -19,6 +19,7 @@ export interface ServiceContainer {
   scheduledPostService: ScheduledPostService;
   publishingService: PublishingService;
   schedulerService: SchedulerService;
+  socialAccountRepository: DrizzleSocialAccountRepository;
   logger: Logger;
 }
 
@@ -63,6 +64,7 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
     scheduledPostService,
     publishingService,
     schedulerService,
+    socialAccountRepository,
     logger,
   };
 }

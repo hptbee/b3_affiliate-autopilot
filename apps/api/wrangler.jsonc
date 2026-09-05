@@ -10,7 +10,8 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "AI_PROVIDER": "workers-ai"
+    "AI_PROVIDER": "workers-ai",
+    "CORS_ORIGIN": "http://localhost:5173"
   },
   "d1_databases": [
     {

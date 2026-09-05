@@ -1,35 +1,55 @@
 # Architecture
 
-See the main [README](../README.md) for the full architecture diagram and setup guide.
+TikTok-first Cloudflare Worker. See the [README](../README.md) and [implementation plan](./IMPLEMENTATION-PLAN.md).
 
 ## Layering
 
 ```
-Route (Hono) → Validation (Zod) → Application Service → Repository → D1
+Route (Hono) → Zod → UserContext → application command → repository → D1
 ```
 
-Business logic lives in `packages/core`. Cloudflare-specific adapters live in `packages/database` and worker entrypoints.
+Business logic lives in `packages/core`. TikTok HTTP belongs in `packages/social` (not implemented yet). Video bytes belong in R2.
 
-## Workers
+## Target Worker
 
-| Worker | Trigger | Responsibility |
-|--------|---------|----------------|
-| `apps/api` | HTTP | REST API, queue producer |
-| `workers/scheduler` | Cron (every 5 min) | Find due posts, enqueue |
-| `workers/publisher` | Queue consumer | Idempotent publish |
-| `workers/workflow` | Workflow | Long-running pipelines (stub) |
+One deployable (`apps/api`):
 
-## Idempotency
+```ts
+fetch()      // HTTP
+scheduled()  // Cron due-post scan
+queue()      // TikTok publish consumer
+```
 
-Publishing uses optimistic locking via D1:
+`workers/scheduler`, `workers/publisher`, and `workers/workflow` are legacy split packages. Do not add more. Fold Cron + Queue into `apps/api` during Phase 0 remainder.
 
-1. Load `ScheduledPost` by ID from queue message
-2. Skip if already `published`
-3. `UPDATE ... SET status = 'publishing' WHERE status IN ('scheduled', 'failed')`
-4. If 0 rows updated, another worker owns the job
-5. Publish via `SocialPublisher`
-6. Store `externalPostId`, mark `published`
+## Lifecycle
 
-## Token Storage
+```text
+Content:        draft → approved → archived | cancelled
+ScheduledPost:  scheduled → publishing → published
+                  publishing → failed | uncertain | dead
+```
 
-OAuth tokens are stored as opaque references (`accessTokenRef`, `refreshTokenRef`), not raw values. This allows migration to Cloudflare Secrets Store or a dedicated vault later.
+A published ScheduledPost must not set Content to `published`.
+
+## Publishing reliability
+
+1. Cron reclaims stale `publishing` (lease ~10 minutes, no `externalPostId`).
+2. Claim with `queuedAt` before enqueue.
+3. Queue payload is `{ scheduledPostId }` only.
+4. If `externalPostId` exists, ack and skip.
+5. CAS lock: `scheduled` | `failed` → `publishing` + `publishingStartedAt`.
+6. Ambiguous TikTok timeout → `uncertain` (never auto-retry).
+
+## Tokens
+
+```text
+ScheduledPost → SocialAccount.accessTokenRef → TokenStore (Worker-only)
+```
+
+Browser and API JSON never receive access or refresh tokens. Encryption lands in Phase 1A.
+
+## Media
+
+D1: `assetId`, `r2Key` (`key`), `mimeType`, `size`, `duration`, `createdAt`.  
+R2: video object. No binaries in D1.

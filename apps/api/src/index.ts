@@ -4,6 +4,7 @@ import {
   rateLimitMiddleware,
   requestIdMiddleware,
   servicesMiddleware,
+  userContextMiddleware,
 } from './middleware/index.js';
 import { contentRoutes } from './routes/content.js';
 import { scheduledPostRoutes } from './routes/scheduled-posts.js';
@@ -15,6 +16,7 @@ const app = new Hono<HonoEnv>();
 
 app.use('*', corsMiddleware);
 app.use('*', requestIdMiddleware);
+app.use('*', userContextMiddleware);
 app.use('*', rateLimitMiddleware);
 app.use('/api/*', servicesMiddleware);
 

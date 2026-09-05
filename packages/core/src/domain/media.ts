@@ -1,7 +1,8 @@
-export const MEDIA_TYPES = ['image', 'video', 'audio', 'document'] as const;
+export const MEDIA_TYPES = ['video'] as const;
 
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
+/** D1 metadata only. Binary lives in R2. */
 export interface Media {
   id: string;
   contentId: string;
@@ -10,6 +11,7 @@ export interface Media {
   mediaType: MediaType;
   mimeType: string;
   size: number;
+  duration: number | null;
   metadata: Record<string, unknown>;
   createdAt: Date;
 }

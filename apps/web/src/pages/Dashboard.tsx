@@ -36,7 +36,7 @@ export function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <p className="text-muted-foreground">Overview of your social automation</p>
+        <p className="text-muted-foreground">TikTok drafts, approvals, and publish jobs</p>
       </div>
 
       {error && (

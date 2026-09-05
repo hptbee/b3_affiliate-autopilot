@@ -1,6 +1,6 @@
 import { createLogger } from '@social-autopilot/core';
 import { createServices, CloudflarePublishQueue } from '@social-autopilot/database';
-import { createSocialPublishers, adaptSocialPublishers } from '@social-autopilot/social';
+import { createSocialPublishers } from '@social-autopilot/social';
 
 export interface Env {
   DB: D1Database;
@@ -16,7 +16,7 @@ export default {
     const services = createServices({
       db: env.DB,
       publishQueue,
-      publishers: adaptSocialPublishers(createSocialPublishers()),
+      publishers: createSocialPublishers(),
       logger,
     });
 

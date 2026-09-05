@@ -55,6 +55,9 @@ export const api = {
   createContent: (data: { title: string; body: string }) =>
     request<Content>('/api/content', { method: 'POST', body: JSON.stringify(data) }),
 
+  approveContent: (id: string) =>
+    request<Content>(`/api/content/${id}/approve`, { method: 'POST' }),
+
   listScheduledPosts: () => request<ScheduledPost[]>('/api/scheduled-posts'),
 
   listSocialAccounts: () => request<SocialAccount[]>('/api/social-accounts'),

@@ -5,7 +5,7 @@ export function SettingsPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold">Settings</h2>
-        <p className="text-muted-foreground">Configure your automation platform</p>
+        <p className="text-muted-foreground">TikTok autopilot configuration</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -36,8 +36,7 @@ export function SettingsPage() {
             <CardDescription>Coming in Phase 5</CardDescription>
           </CardHeader>
           <p className="text-sm text-muted-foreground">
-            Multi-user authentication, teams, and role-based access control are planned for a
-            future release.
+            Multi-user identity is out of MVP. Requests already use a UserContext (bootstrap user).
           </p>
         </Card>
       </div>

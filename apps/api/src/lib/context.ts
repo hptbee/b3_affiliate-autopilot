@@ -1,11 +1,11 @@
 import { createAIProvider } from '@social-autopilot/ai';
 import { createServices, CloudflarePublishQueue } from '@social-autopilot/database';
-import { createSocialPublishers, adaptSocialPublishers } from '@social-autopilot/social';
+import { createSocialPublishers } from '@social-autopilot/social';
 import type { Env } from '../../worker-configuration';
 
 export function createAppContext(env: Env) {
   const publishQueue = new CloudflarePublishQueue(env.PUBLISH_QUEUE);
-  const publishers = adaptSocialPublishers(createSocialPublishers());
+  const publishers = createSocialPublishers();
 
   const services = createServices({
     db: env.DB,

@@ -63,8 +63,14 @@ export class AIProviderError extends AppError {
   }
 }
 
+export type PublishFailureOutcome = 'failed' | 'uncertain' | 'dead';
+
 export class SocialPublishError extends AppError {
-  constructor(message: string, details?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public readonly outcome: PublishFailureOutcome = 'failed',
+    details?: Record<string, unknown>,
+  ) {
     super('SOCIAL_PUBLISH_ERROR', message, 502, details);
   }
 }
