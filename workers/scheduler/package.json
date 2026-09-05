@@ -1,0 +1,24 @@
+{
+  "name": "@social-autopilot/scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir=dist",
+    "cf:deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@social-autopilot/core": "workspace:*",
+    "@social-autopilot/database": "workspace:*",
+    "@social-autopilot/social": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250317.0",
+    "@social-autopilot/config": "workspace:*",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.1.0"
+  }
+}

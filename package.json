@@ -1,0 +1,28 @@
+{
+  "name": "social-autopilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare-native AI social media automation platform",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @social-autopilot/database db:generate",
+    "db:migrate": "pnpm --filter @social-autopilot/database db:migrate",
+    "cf:dev": "pnpm --filter @social-autopilot/api cf:dev",
+    "cf:deploy": "turbo run cf:deploy",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,jsonc,md}\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "prettier": "^3.5.3",
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@social-autopilot/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./typescript/base": "./typescript/base.json",
+    "./typescript/react": "./typescript/react.json",
+    "./typescript/worker": "./typescript/worker.json"
+  }
+}
