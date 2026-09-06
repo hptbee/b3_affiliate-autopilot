@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Content } from '../domain/content.js';
+import type { Content, ContentStatus } from '../domain/content.js';
 import { isStalePublishing, type ScheduledPost } from '../domain/scheduled-post.js';
 import type { SocialAccount } from '../domain/social-account.js';
 import {
@@ -7,7 +7,7 @@ import {
   type PublishPostResult,
   type SocialPublisher,
 } from '../application/publishing-service.js';
-import type { ContentRepository } from '../application/content-service.js';
+import type { ContentRepository, UpdateContentInput } from '../application/content-service.js';
 import type {
   ScheduledPostRepository,
   SocialAccountRepository,
@@ -108,7 +108,8 @@ function createPublishingService(options: {
   let post = options.post ?? createScheduledPost();
   const content = createContent();
   const account = createAccount();
-  const contentUpdates: Array<{ status?: string }> = [];
+  const contentUpdates: UpdateContentInput[] = [];
+  const statusUpdates: ContentStatus[] = [];
 
   const scheduledPostRepository: ScheduledPostRepository = {
     ...emptyRepoMethods(),
@@ -163,6 +164,10 @@ function createPublishingService(options: {
       contentUpdates.push(input);
       return { ...content, ...input };
     },
+    async updateStatus(_id, status) {
+      statusUpdates.push(status);
+      return { ...content, status };
+    },
     async delete() {},
   };
 
@@ -197,14 +202,16 @@ function createPublishingService(options: {
     createLogger('test'),
   );
 
-  return { service, mockPublisher, getPost: () => post, contentUpdates };
+  return { service, mockPublisher, getPost: () => post, contentUpdates, statusUpdates };
 }
 
 describe('PublishingService', () => {
   it('publishes successfully without changing Content status', async () => {
     const { service, mockPublisher, contentUpdates } = createPublishingService({});
-    const result = await service.publishScheduledPost('post-1');
-    expect(result?.externalPostId).toBe('ext-post-1');
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('published');
+    expect(outcome.result?.externalPostId).toBe('ext-post-1');
     expect(mockPublisher.publish).toHaveBeenCalledOnce();
     expect(contentUpdates).toHaveLength(0);
   });
@@ -217,8 +224,10 @@ describe('PublishingService', () => {
         publishedAt: new Date(),
       }),
     });
-    const result = await service.publishScheduledPost('post-1');
-    expect(result?.externalPostId).toBe('already-published');
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('already_published');
+    expect(outcome.result?.externalPostId).toBe('already-published');
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 
@@ -227,32 +236,39 @@ describe('PublishingService', () => {
       post: createScheduledPost({ status: 'publishing' }),
       acquireLock: false,
     });
-    const result = await service.publishScheduledPost('post-1');
-    expect(result).toBeNull();
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('skipped');
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 
-  it('marks retryable failures as failed', async () => {
+  it('marks retryable failures as failed and requests retry', async () => {
     const { service, getPost } = createPublishingService({
       publishError: new SocialPublishError('Rate limited', 'failed'),
     });
-    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Rate limited');
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('retry');
+    expect(outcome.disposition).toBe('failed');
     expect(getPost().status).toBe('failed');
   });
 
-  it('marks ambiguous provider errors as uncertain', async () => {
+  it('marks ambiguous provider errors as uncertain and acks', async () => {
     const { service, getPost } = createPublishingService({
       publishError: new SocialPublishError('Timeout after send', 'uncertain'),
     });
-    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Timeout after send');
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('uncertain');
     expect(getPost().status).toBe('uncertain');
   });
 
-  it('marks permanent errors as dead', async () => {
+  it('marks permanent errors as dead and acks', async () => {
     const { service, getPost } = createPublishingService({
       publishError: new SocialPublishError('Video rejected', 'dead'),
     });
-    await expect(service.publishScheduledPost('post-1')).rejects.toThrow('Video rejected');
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('dead');
     expect(getPost().status).toBe('dead');
   });
 
@@ -260,8 +276,9 @@ describe('PublishingService', () => {
     const { service, mockPublisher } = createPublishingService({
       post: createScheduledPost({ status: 'uncertain' }),
     });
-    const result = await service.publishScheduledPost('post-1');
-    expect(result).toBeNull();
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.queueAction).toBe('ack');
+    expect(outcome.disposition).toBe('uncertain');
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 });

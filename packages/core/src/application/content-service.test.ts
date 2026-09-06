@@ -52,6 +52,13 @@ function createMockRepository(content: Content = createMockContent()): ContentRe
       store.set(id, updated);
       return updated;
     },
+    async updateStatus(id, status) {
+      const existing = store.get(id);
+      if (!existing) throw new Error('not found');
+      const updated = { ...existing, status, updatedAt: new Date() };
+      store.set(id, updated);
+      return updated;
+    },
     async delete(id) {
       store.delete(id);
     },

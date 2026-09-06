@@ -61,7 +61,7 @@ export class DrizzleContentRepository implements ContentRepository {
 
   async update(
     id: string,
-    input: { title?: string; body?: string; contentType?: ContentType; status?: ContentStatus },
+    input: { title?: string; body?: string; contentType?: ContentType },
   ): Promise<Content> {
     const now = new Date();
     await this.db
@@ -70,6 +70,17 @@ export class DrizzleContentRepository implements ContentRepository {
       .where(eq(contents.id, id));
     const updated = await this.findById(id);
     if (!updated) throw new Error(`Content not found after update: ${id}`);
+    return updated;
+  }
+
+  async updateStatus(id: string, status: ContentStatus): Promise<Content> {
+    const now = new Date();
+    await this.db
+      .update(contents)
+      .set({ status, updatedAt: now })
+      .where(eq(contents.id, id));
+    const updated = await this.findById(id);
+    if (!updated) throw new Error(`Content not found after status update: ${id}`);
     return updated;
   }
 

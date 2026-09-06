@@ -1,8 +1,0 @@
-{
-  "extends": "@social-autopilot/config/typescript/worker",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist"
-  },
-  "include": ["src/**/*"]
-}

@@ -20,6 +20,20 @@ export interface PublishPostResult {
   publishedAt: Date;
 }
 
+export type PublishScheduledPostDisposition =
+  | 'published'
+  | 'already_published'
+  | 'uncertain'
+  | 'dead'
+  | 'failed'
+  | 'skipped';
+
+export interface PublishScheduledPostOutcome {
+  queueAction: 'ack' | 'retry';
+  disposition: PublishScheduledPostDisposition;
+  result?: PublishPostResult;
+}
+
 export interface SocialPublisher {
   platform: SocialPlatform;
   publish(input: PublishPostInput): Promise<PublishPostResult>;
@@ -34,7 +48,7 @@ export class PublishingService {
     private readonly logger: Logger,
   ) {}
 
-  async publishScheduledPost(scheduledPostId: string): Promise<PublishPostResult | null> {
+  async publishScheduledPost(scheduledPostId: string): Promise<PublishScheduledPostOutcome> {
     const start = Date.now();
     const post = await this.scheduledPostRepository.findById(scheduledPostId);
 
@@ -49,9 +63,13 @@ export class PublishingService {
         status: 'published',
       });
       return {
-        externalPostId: post.externalPostId,
-        platform: 'tiktok',
-        publishedAt: post.publishedAt ?? new Date(),
+        queueAction: 'ack',
+        disposition: 'already_published',
+        result: {
+          externalPostId: post.externalPostId,
+          platform: 'tiktok',
+          publishedAt: post.publishedAt ?? new Date(),
+        },
       };
     }
 
@@ -61,7 +79,7 @@ export class PublishingService {
         entityId: scheduledPostId,
         status: 'uncertain',
       });
-      return null;
+      return { queueAction: 'ack', disposition: 'uncertain' };
     }
 
     const acquired = await this.scheduledPostRepository.acquirePublishingLock(
@@ -74,7 +92,7 @@ export class PublishingService {
         entityId: scheduledPostId,
         status: post.status,
       });
-      return null;
+      return { queueAction: 'ack', disposition: 'skipped' };
     }
 
     try {
@@ -112,7 +130,7 @@ export class PublishingService {
         duration: Date.now() - start,
       });
 
-      return result;
+      return { queueAction: 'ack', disposition: 'published', result };
     } catch (error) {
       const outcome =
         error instanceof SocialPublishError ? error.outcome : ('failed' as const);
@@ -134,7 +152,11 @@ export class PublishingService {
         errorCode: 'SOCIAL_PUBLISH_ERROR',
       });
 
-      throw error;
+      if (outcome === 'uncertain' || outcome === 'dead') {
+        return { queueAction: 'ack', disposition: outcome };
+      }
+
+      return { queueAction: 'retry', disposition: 'failed' };
     }
   }
 }

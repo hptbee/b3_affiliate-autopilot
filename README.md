@@ -51,7 +51,7 @@ This repo is **not** at MVP yet. Next implementation step is **Phase 1A: TikTok 
 ```text
 React Dashboard
       ↓
-Cloudflare Worker + Hono   (target: fetch + scheduled + queue in one Worker)
+Cloudflare Worker + Hono (`apps/api`: `fetch` + `scheduled` + `queue`)
       ↓
 D1 ──────────────── R2
  │                   │
@@ -74,7 +74,7 @@ Workers AI / OpenAI
 
 | Service | Role |
 |---------|------|
-| Workers | HTTP API; target also Cron + Queue consumer |
+| Workers | HTTP API, Cron, and Queue consumer (`apps/api`) |
 | D1 | Users, content, scheduled posts, account metadata, token *refs* |
 | R2 | Video binaries (metadata stays in D1) |
 | Queues | `{ scheduledPostId }` publish jobs |
@@ -85,7 +85,7 @@ Workers AI / OpenAI
 
 Do **not** introduce Redis, PostgreSQL, Temporal, SQS, Durable Objects, Kubernetes, or extra microservices.
 
-Today `workers/scheduler` and `workers/publisher` still exist as separate Wrangler projects. **Target:** fold Cron and Queue handlers into `apps/api`. Do not add more Workers.
+`apps/api` is the only deployable Worker. Cron and Queue handlers live in `apps/api/src/handlers/`.
 
 ## Domain
 
@@ -104,14 +104,14 @@ Prerequisites: Node.js 20+, pnpm 9+.
 ```bash
 pnpm install
 
-cd apps/api
-pnpm wrangler d1 migrations apply social-autopilot-db --local
-pnpm wrangler d1 execute social-autopilot-db --local --file=../../scripts/seed.sql
-cd ../..
+pnpm db:migrate
+pnpm --filter @social-autopilot/api exec wrangler d1 execute social-autopilot-db --local --file=../../scripts/seed.sql
 
 pnpm cf:dev
 pnpm --filter @social-autopilot/web dev
 ```
+
+`pnpm db:migrate` applies SQL migrations to local D1 via Wrangler. Use `pnpm db:generate` after editing the Drizzle schema.
 
 Optional `apps/api/.dev.vars`:
 
@@ -171,7 +171,7 @@ Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, ow
 
 See [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md).
 
-- **Phase 0** — Architecture hardening (in progress in this codebase)
+- **Phase 0** — Architecture hardening (complete)
 - **Phase 1** — TikTok MVP (OAuth, R2 video, publisher, schedule E2E)
 - **Phase 2** — TikTok AI drafts
 - **Phase 3** — AI video pipeline

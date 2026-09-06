@@ -10,7 +10,7 @@ Route (Hono) → Zod → UserContext → application command → repository → 
 
 Business logic lives in `packages/core`. TikTok HTTP belongs in `packages/social` (not implemented yet). Video bytes belong in R2.
 
-## Target Worker
+## Worker runtime
 
 One deployable (`apps/api`):
 
@@ -20,7 +20,7 @@ scheduled()  // Cron due-post scan
 queue()      // TikTok publish consumer
 ```
 
-`workers/scheduler`, `workers/publisher`, and `workers/workflow` are legacy split packages. Do not add more. Fold Cron + Queue into `apps/api` during Phase 0 remainder.
+Handlers: `apps/api/src/handlers/scheduled.ts`, `apps/api/src/handlers/queue.ts`.
 
 ## Lifecycle
 

@@ -19,10 +19,8 @@ export interface ContentRepository {
   create(input: CreateContentInput & { userId: string }): Promise<Content>;
   findById(id: string): Promise<Content | null>;
   findByUserId(userId: string): Promise<Content[]>;
-  update(
-    id: string,
-    input: UpdateContentInput & { status?: ContentStatus },
-  ): Promise<Content>;
+  update(id: string, input: UpdateContentInput): Promise<Content>;
+  updateStatus(id: string, status: ContentStatus): Promise<Content>;
   delete(id: string): Promise<void>;
 }
 
@@ -70,19 +68,19 @@ export class ContentService {
   async approve(user: UserContext, id: string): Promise<Content> {
     const existing = await this.getById(user, id);
     this.assertTransition(existing.status, 'approved');
-    return this.repository.update(id, { status: 'approved' });
+    return this.repository.updateStatus(id, 'approved');
   }
 
   async cancel(user: UserContext, id: string): Promise<Content> {
     const existing = await this.getById(user, id);
     this.assertTransition(existing.status, 'cancelled');
-    return this.repository.update(id, { status: 'cancelled' });
+    return this.repository.updateStatus(id, 'cancelled');
   }
 
   async archive(user: UserContext, id: string): Promise<Content> {
     const existing = await this.getById(user, id);
     this.assertTransition(existing.status, 'archived');
-    return this.repository.update(id, { status: 'archived' });
+    return this.repository.updateStatus(id, 'archived');
   }
 
   async delete(user: UserContext, id: string): Promise<void> {

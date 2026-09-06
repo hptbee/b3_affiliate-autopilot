@@ -26,25 +26,21 @@ TikTok is the only destination. Extensibility remains via one `SocialPublisher` 
 ```mermaid
 flowchart TD
     Web[apps/web]
-    API[apps/api fetch]
+    API[apps/api]
     D1[(D1)]
     R2[(R2 unused by API yet)]
     Q[Queue]
-    Cron[workers/scheduler]
-    Pub[workers/publisher]
     Mock[MockTikTokPublisher]
 
     Web --> API
     API --> D1
     API --> Q
-    Cron --> D1
-    Cron --> Q
-    Q --> Pub
-    Pub --> D1
-    Pub --> Mock
+    API -->|"scheduled()"| D1
+    API -->|"queue()"| D1
+    API --> Mock
 ```
 
-**Target runtime:** `apps/api` handles `fetch` + `scheduled` + `queue`. Scheduler/publisher packages remain until that fold.
+**Runtime:** `apps/api` handles `fetch` + `scheduled` + `queue`.
 
 ---
 
@@ -65,13 +61,10 @@ flowchart TD
 
 ## 4. Problems found (remaining)
 
-- Cron + Queue still separate Workers (document-only until fold)
-- `TokenStore` is an interface only — no encryption yet
+- `TokenStore` is an interface only — no encryption yet (Phase 1A)
 - In-memory rate limiter is not a production control
 - AI generate is not an HTTP route yet (Phase 2)
 - R2 upload API not wired (Phase 1B)
-- Workflow Worker is unused — do not invest in it
-- `db:migrate` via drizzle-kit does not match Wrangler D1 apply
 
 ---
 
@@ -96,7 +89,7 @@ packages/core       commands + domain
 packages/ai         TikTok draft schema + providers
 packages/social     SocialPublisher port + MockTikTokPublisher; later tiktok/*
 packages/database   Drizzle only
-apps/api            composition root + HTTP (+ later cron/queue)
+apps/api            composition root + fetch/scheduled/queue
 apps/web            dashboard
 ```
 
@@ -202,7 +195,7 @@ Mock TikTok only. No live TikTok or AI.
 
 ### Phase 0 — Architecture hardening
 
-Lifecycle split, commands, UserContext, lease, idempotency, uncertain, Zod 400, CORS allowlist, tests. **Mostly applied.** Remaining: merge Cron/Queue into `apps/api`.
+Lifecycle split, commands, UserContext, lease, idempotency, uncertain, Zod 400, CORS allowlist, one Worker (`fetch` + `scheduled` + `queue`), tests. **Complete.**
 
 ### Phase 1 — TikTok MVP
 
@@ -238,7 +231,6 @@ TTS, clips, subtitles, hook optimization — not MVP.
 
 | Task | Pri |
 |------|-----|
-| Phase 0 remainder (one Worker) | P0 |
 | TikTok OAuth + TokenStore | P0 |
 | R2 video upload | P0 |
 | TikTokPublisher + uncertain handling | P0 |

@@ -10,7 +10,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "db:generate": "pnpm --filter @social-autopilot/database db:generate",
-    "db:migrate": "pnpm --filter @social-autopilot/database db:migrate",
+    "db:migrate": "pnpm --filter @social-autopilot/api exec wrangler d1 migrations apply social-autopilot-db --local",
     "cf:dev": "pnpm --filter @social-autopilot/api cf:dev",
     "cf:deploy": "turbo run cf:deploy",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,jsonc,md}\""

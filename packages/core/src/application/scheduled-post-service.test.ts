@@ -170,6 +170,12 @@ function createServices(
       contentStore.set(id, updated);
       return updated;
     },
+    async updateStatus(id, status) {
+      const existing = contentStore.get(id)!;
+      const updated = { ...existing, status };
+      contentStore.set(id, updated);
+      return updated;
+    },
     async delete() {},
   };
 

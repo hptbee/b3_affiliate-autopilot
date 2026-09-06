@@ -8,6 +8,9 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "vars": {
     "ENVIRONMENT": "development",
     "AI_PROVIDER": "workers-ai",
@@ -33,6 +36,14 @@
         "binding": "PUBLISH_QUEUE",
         "queue": "social-autopilot-publish"
       }
+    ],
+    "consumers": [
+      {
+        "queue": "social-autopilot-publish",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "social-autopilot-publish-dlq"
+      }
     ]
   },
   "ai": {
@@ -41,9 +52,13 @@
   "env": {
     "staging": {
       "name": "social-autopilot-api-staging",
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      },
       "vars": {
         "ENVIRONMENT": "staging",
-        "AI_PROVIDER": "workers-ai"
+        "AI_PROVIDER": "workers-ai",
+        "CORS_ORIGIN": "https://staging.example.com"
       },
       "d1_databases": [
         {
@@ -65,14 +80,26 @@
             "binding": "PUBLISH_QUEUE",
             "queue": "social-autopilot-publish-staging"
           }
+        ],
+        "consumers": [
+          {
+            "queue": "social-autopilot-publish-staging",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "social-autopilot-publish-dlq-staging"
+          }
         ]
       }
     },
     "production": {
       "name": "social-autopilot-api",
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      },
       "vars": {
         "ENVIRONMENT": "production",
-        "AI_PROVIDER": "openai"
+        "AI_PROVIDER": "openai",
+        "CORS_ORIGIN": "https://app.example.com"
       },
       "d1_databases": [
         {
@@ -93,6 +120,14 @@
           {
             "binding": "PUBLISH_QUEUE",
             "queue": "social-autopilot-publish"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "social-autopilot-publish",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "social-autopilot-publish-dlq"
           }
         ]
       }

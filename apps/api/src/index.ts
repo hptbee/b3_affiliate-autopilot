@@ -36,5 +36,13 @@ app.notFound((c) =>
   c.json({ error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404),
 );
 
-export default app;
+import { scheduled } from './handlers/scheduled.js';
+import { queue } from './handlers/queue.js';
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+  queue,
+};
+
 export type { Env };
