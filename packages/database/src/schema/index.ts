@@ -81,12 +81,32 @@ export const scheduledPosts = sqliteTable(
     retryCount: integer('retry_count').notNull().default(0),
     queuedAt: integer('queued_at', { mode: 'timestamp' }),
     publishingStartedAt: integer('publishing_started_at', { mode: 'timestamp' }),
+    privacyLevel: text('privacy_level').notNull().default('self_only'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
   (table) => [
     index('scheduled_posts_status_scheduled_at_idx').on(table.status, table.scheduledAt),
   ],
+);
+
+export const tokenBlobs = sqliteTable('token_blobs', {
+  id: text('id').primaryKey(),
+  ciphertext: text('ciphertext').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const oauthStates = sqliteTable(
+  'oauth_states',
+  {
+    state: text('state').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('oauth_states_expires_at_idx').on(table.expiresAt)],
 );
 
 export type UserRow = typeof users.$inferSelect;

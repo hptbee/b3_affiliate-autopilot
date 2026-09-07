@@ -7,4 +7,8 @@ export interface Env {
   AI_PROVIDER: string;
   OPENAI_API_KEY?: string;
   CORS_ORIGIN?: string;
+  TOKEN_WRAP_KEY?: string;
+  TIKTOK_CLIENT_KEY?: string;
+  TIKTOK_CLIENT_SECRET?: string;
+  TIKTOK_REDIRECT_URI?: string;
 }

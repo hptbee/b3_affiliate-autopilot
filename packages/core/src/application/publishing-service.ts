@@ -5,13 +5,14 @@ import { SocialPublishError, NotFoundError } from '../types/errors.js';
 import type { Logger } from '../types/logger.js';
 import type { ContentRepository } from './content-service.js';
 import type { ScheduledPostRepository } from './scheduled-post-service.js';
-import type { SocialAccountRepository } from './scheduled-post-service.js';
+import type { SocialAccountRepository } from './social-account-repository.js';
 
 export interface PublishPostInput {
   content: Content;
   socialAccount: SocialAccount;
   scheduledPost: ScheduledPost;
   idempotencyKey: string;
+  caption: string;
 }
 
 export interface PublishPostResult {
@@ -119,6 +120,7 @@ export class PublishingService {
         socialAccount: account,
         scheduledPost: post,
         idempotencyKey: scheduledPostId,
+        caption: content.body,
       });
 
       await this.scheduledPostRepository.markPublished(scheduledPostId, result.externalPostId);

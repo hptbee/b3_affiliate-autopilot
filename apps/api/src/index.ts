@@ -9,6 +9,7 @@ import {
 import { contentRoutes } from './routes/content.js';
 import { scheduledPostRoutes } from './routes/scheduled-posts.js';
 import { socialAccountRoutes } from './routes/social-accounts.js';
+import { oauthTikTokRoutes } from './routes/oauth-tiktok.js';
 import type { HonoEnv } from './lib/errors.js';
 import type { Env } from '../worker-configuration.js';
 
@@ -31,6 +32,7 @@ app.get('/health', (c) =>
 app.route('/api/content', contentRoutes);
 app.route('/api/scheduled-posts', scheduledPostRoutes);
 app.route('/api/social-accounts', socialAccountRoutes);
+app.route('/api/oauth/tiktok', oauthTikTokRoutes);
 
 app.notFound((c) =>
   c.json({ error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404),

@@ -4,15 +4,18 @@ import {
   isPublishable,
   MAX_PUBLISH_RETRIES,
 } from '../domain/scheduled-post.js';
-import type { SocialAccount } from '../domain/social-account.js';
+import type { ScheduledPostPrivacyLevel } from '../domain/scheduled-post.js';
 import type { UserContext } from '../types/user-context.js';
 import { ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
 import type { ContentRepository } from './content-service.js';
+import type { MediaRepository } from './media-service.js';
+import type { SocialAccountRepository } from './social-account-repository.js';
 
 export interface CreateScheduledPostInput {
   contentId: string;
   socialAccountId: string;
   scheduledAt: Date;
+  privacyLevel?: ScheduledPostPrivacyLevel;
 }
 
 export interface ScheduledPostRepository {
@@ -31,16 +34,12 @@ export interface ScheduledPostRepository {
   reclaimStalePublishing(now: Date, leaseMs: number): Promise<number>;
 }
 
-export interface SocialAccountRepository {
-  findById(id: string): Promise<SocialAccount | null>;
-  findByUserId(userId: string): Promise<SocialAccount[]>;
-}
-
 export class ScheduledPostService {
   constructor(
     private readonly scheduledPostRepository: ScheduledPostRepository,
     private readonly contentRepository: ContentRepository,
     private readonly socialAccountRepository: SocialAccountRepository,
+    private readonly mediaRepository: MediaRepository,
   ) {}
 
   async create(user: UserContext, input: CreateScheduledPostInput): Promise<ScheduledPost> {
@@ -66,6 +65,11 @@ export class ScheduledPostService {
 
     if (input.scheduledAt.getTime() <= Date.now()) {
       throw new ValidationError('Scheduled time must be in the future');
+    }
+
+    const media = await this.mediaRepository.findByContentId(input.contentId);
+    if (!media) {
+      throw new ConflictError('Content must have an uploaded video before scheduling');
     }
 
     return this.scheduledPostRepository.create(input);

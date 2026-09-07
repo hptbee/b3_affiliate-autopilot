@@ -15,3 +15,6 @@ export * from './application/content-service.js';
 export * from './application/scheduled-post-service.js';
 export * from './application/scheduler-service.js';
 export * from './application/publishing-service.js';
+export * from './application/social-account-repository.js';
+export * from './application/social-account-service.js';
+export * from './application/media-service.js';

@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import { Hono } from 'hono';
+import { SCHEDULED_POST_PRIVACY_LEVELS } from '@social-autopilot/core';
 import type { HonoEnv } from '../lib/errors.js';
 import { getServices, getUser, handleError } from '../lib/errors.js';
 
-const createScheduledPostSchema = z.object({
-  contentId: z.string().uuid(),
-  socialAccountId: z.string().uuid(),
-  scheduledAt: z.string().datetime(),
-});
+const createScheduledPostSchema = z
+  .object({
+    contentId: z.string().uuid(),
+    socialAccountId: z.string().uuid(),
+    scheduledAt: z.string().datetime(),
+    privacyLevel: z.enum(SCHEDULED_POST_PRIVACY_LEVELS).optional(),
+  })
+  .strict();
 
 export const scheduledPostRoutes = new Hono<HonoEnv>();
 
@@ -29,6 +33,7 @@ scheduledPostRoutes.post('/', async (c) => {
       contentId: body.contentId,
       socialAccountId: body.socialAccountId,
       scheduledAt: new Date(body.scheduledAt),
+      privacyLevel: body.privacyLevel,
     });
     return c.json({ data: post }, 201);
   } catch (error) {

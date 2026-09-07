@@ -10,11 +10,16 @@ export const SCHEDULED_POST_STATUSES = [
 
 export type ScheduledPostStatus = (typeof SCHEDULED_POST_STATUSES)[number];
 
+export const SCHEDULED_POST_PRIVACY_LEVELS = ['self_only', 'public'] as const;
+
+export type ScheduledPostPrivacyLevel = (typeof SCHEDULED_POST_PRIVACY_LEVELS)[number];
+
 export interface ScheduledPost {
   id: string;
   contentId: string;
   socialAccountId: string;
   scheduledAt: Date;
+  privacyLevel: ScheduledPostPrivacyLevel;
   status: ScheduledPostStatus;
   publishedAt: Date | null;
   externalPostId: string | null;

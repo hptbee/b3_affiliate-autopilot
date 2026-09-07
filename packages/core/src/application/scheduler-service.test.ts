@@ -11,6 +11,7 @@ function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledP
     contentId: 'content-1',
     socialAccountId: 'account-1',
     scheduledAt: new Date('2026-01-01T00:00:00Z'),
+    privacyLevel: 'self_only',
     status: 'scheduled',
     publishedAt: null,
     externalPostId: null,

@@ -44,7 +44,7 @@ TikTok is the only MVP destination. Other platforms may be added later; they are
 10. Persist publishing result
 11. Handle failed / uncertain publishing without duplicate posts
 
-This repo is **not** at MVP yet. Next implementation step is **Phase 1A: TikTok OAuth**.
+This repo implements the Phase 1 TikTok MVP path. Without TikTok secrets it still publishes through `MockTikTokPublisher`. Next step is **Phase 2: TikTok AI drafts**.
 
 ## Cloudflare architecture
 
@@ -79,7 +79,7 @@ Workers AI / OpenAI
 | R2 | Video binaries (metadata stays in D1) |
 | Queues | `{ scheduledPostId }` publish jobs |
 | Cron | Find due posts, claim `queuedAt`, enqueue |
-| Worker Secrets | `OPENAI_API_KEY`, later TikTok client secret + `TOKEN_WRAP_KEY` |
+| Worker Secrets | `OPENAI_API_KEY`, `TOKEN_WRAP_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REDIRECT_URI` |
 | Workers AI | Default generate in development |
 | OpenAI | Optional structured-generation provider |
 
@@ -96,6 +96,20 @@ Publishing status does **not** live here.
 Failures: `publishing → failed` (retryable) or `uncertain` (do not retry) or `dead`.
 
 Scheduling requires `Content.status === approved`.
+
+## Local E2E (Phase 1)
+
+```bash
+pnpm install
+pnpm db:migrate
+pnpm --filter @social-autopilot/api exec wrangler d1 execute social-autopilot-db --local --file=../../scripts/seed.sql
+pnpm cf:dev
+pnpm --filter @social-autopilot/web dev
+```
+
+Path: create draft → upload video → approve → schedule (mock or connected TikTok account) → cron/queue → `externalPostId`.
+
+Without TikTok secrets, publishing uses `MockTikTokPublisher`. Set secrets in `apps/api/.dev.vars` for live OAuth/publish.
 
 ## Local setup
 
@@ -149,7 +163,12 @@ Fill real `database_id` values in `wrangler.jsonc`. Resources are not created au
 | GET | `/api/scheduled-posts` | List current user's jobs |
 | POST | `/api/scheduled-posts` | Schedule approved content |
 | POST | `/api/scheduled-posts/:id/cancel` | Cancel job |
+| GET | `/api/oauth/tiktok/start` | Start TikTok OAuth (redirect) |
+| GET | `/api/oauth/tiktok/callback` | OAuth callback (redirect to web) |
+| POST | `/api/content/:id/media` | Upload video (multipart) |
+| GET | `/api/content/:id/media` | Get video metadata |
 | GET | `/api/social-accounts` | List TikTok accounts (no tokens) |
+| POST | `/api/social-accounts/:id/disconnect` | Disconnect TikTok account |
 
 `userId` is never taken from the request body. `UserContext` is set in middleware (bootstrap user today).
 
@@ -172,7 +191,7 @@ Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, ow
 See [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md).
 
 - **Phase 0** — Architecture hardening (complete)
-- **Phase 1** — TikTok MVP (OAuth, R2 video, publisher, schedule E2E)
+- **Phase 1** — TikTok MVP (complete; live TikTok requires secrets)
 - **Phase 2** — TikTok AI drafts
 - **Phase 3** — AI video pipeline
 - **Phase 4** — Research

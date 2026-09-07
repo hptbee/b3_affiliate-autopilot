@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Badge } from '../components/ui';
+import { Card, Badge, Button } from '../components/ui';
 import { api, type SocialAccount } from '../lib/api';
 
 export function AccountsPage() {
@@ -15,9 +15,12 @@ export function AccountsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold">TikTok Account</h2>
-        <p className="text-muted-foreground">OAuth connection lands in Phase 1A. Tokens never appear here.</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">TikTok Account</h2>
+          <p className="text-muted-foreground">Tokens never appear here. OAuth runs server-side.</p>
+        </div>
+        <Button onClick={() => api.startTikTokOAuth()}>Connect TikTok</Button>
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
@@ -25,7 +28,7 @@ export function AccountsPage() {
       {accounts.length === 0 ? (
         <Card>
           <p className="text-muted-foreground text-sm">
-            No TikTok account connected yet. Use the local seed for a mock account.
+            No TikTok account connected yet. Use Connect TikTok or the local seed for a mock account.
           </p>
         </Card>
       ) : (

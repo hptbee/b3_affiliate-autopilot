@@ -95,3 +95,35 @@ contentRoutes.delete('/:id', async (c) => {
     return handleError(c, error);
   }
 });
+
+contentRoutes.post('/:id/media', async (c) => {
+  try {
+    const formData = await c.req.formData();
+    const rawFile = formData.get('file');
+    if (!rawFile || typeof rawFile === 'string') {
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'file is required' } }, 400);
+    }
+
+    const file = rawFile as File;
+    const bytes = await file.arrayBuffer();
+    const { mediaService } = getServices(c);
+    const media = await mediaService.uploadForContent(getUser(c), c.req.param('id'), {
+      bytes,
+      mimeType: file.type || 'video/mp4',
+      size: file.size,
+    });
+    return c.json({ data: media }, 201);
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.get('/:id/media', async (c) => {
+  try {
+    const { mediaService } = getServices(c);
+    const media = await mediaService.getForContent(getUser(c), c.req.param('id'));
+    return c.json({ data: media });
+  } catch (error) {
+    return handleError(c, error);
+  }
+});

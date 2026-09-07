@@ -10,8 +10,8 @@ import {
 import type { ContentRepository, UpdateContentInput } from '../application/content-service.js';
 import type {
   ScheduledPostRepository,
-  SocialAccountRepository,
 } from '../application/scheduled-post-service.js';
+import type { SocialAccountRepository } from '../application/social-account-repository.js';
 import { SocialPublishError } from '../types/errors.js';
 import { createLogger } from '../types/logger.js';
 
@@ -21,6 +21,7 @@ function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledP
     contentId: 'content-1',
     socialAccountId: 'account-1',
     scheduledAt: new Date(),
+    privacyLevel: 'self_only',
     status: 'scheduled',
     publishedAt: null,
     externalPostId: null,
@@ -177,6 +178,18 @@ function createPublishingService(options: {
     },
     async findByUserId() {
       return [account];
+    },
+    async findByUserAndPlatform() {
+      return account;
+    },
+    async upsertByUserAndPlatform() {
+      return account;
+    },
+    async updateTokens() {
+      return account;
+    },
+    async disconnect() {
+      return account;
     },
   };
 

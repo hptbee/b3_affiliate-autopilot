@@ -199,11 +199,13 @@ Lifecycle split, commands, UserContext, lease, idempotency, uncertain, Zod 400, 
 
 ### Phase 1 — TikTok MVP
 
-**1A OAuth** — start/callback, account row, TokenStore encrypt, refresh server-side.  
-**1B Video** — R2 upload, D1 metadata (`key`, mime, size, duration), ownership.  
-**1C Publisher** — TikTok client, error mapping, retry vs uncertain vs dead.  
-**1D Scheduling** — dashboard approve → schedule → cron → queue → publisher.  
-**1E E2E** — create → approve → upload → connect → schedule → persist `externalPostId`.
+**1A OAuth** — start/callback, encrypted TokenStore, refresh server-side. **Done.**  
+**1B Video** — R2 upload, D1 metadata, ownership. **Done.**  
+**1C Publisher** — TikTok Content Posting client, error mapping, mock fallback. **Done.**  
+**1D Scheduling** — dashboard upload/schedule/cancel/connect. **Done.**  
+**1E E2E** — local path documented; mock publish without secrets. **Done.**
+
+Live TikTok publish requires Worker secrets. Automated tests use mocked TikTok HTTP only.
 
 ### Phase 2 — TikTok AI
 

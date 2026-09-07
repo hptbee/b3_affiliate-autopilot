@@ -6,19 +6,19 @@ export const socialAccountRoutes = new Hono<HonoEnv>();
 
 socialAccountRoutes.get('/', async (c) => {
   try {
-    const { socialAccountRepository } = getServices(c);
-    const accounts = await socialAccountRepository.findByUserId(getUser(c).userId);
-    return c.json({
-      data: accounts
-        .filter((account) => account.platform === 'tiktok')
-        .map((account) => ({
-          id: account.id,
-          platform: account.platform,
-          displayName: account.displayName,
-          status: account.status,
-          createdAt: account.createdAt,
-        })),
-    });
+    const { socialAccountService } = getServices(c);
+    const accounts = await socialAccountService.listForUser(getUser(c));
+    return c.json({ data: accounts });
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+socialAccountRoutes.post('/:id/disconnect', async (c) => {
+  try {
+    const { socialAccountService } = getServices(c);
+    const account = await socialAccountService.disconnect(getUser(c), c.req.param('id'));
+    return c.json({ data: account });
   } catch (error) {
     return handleError(c, error);
   }

@@ -22,6 +22,10 @@ queue()      // TikTok publish consumer
 
 Handlers: `apps/api/src/handlers/scheduled.ts`, `apps/api/src/handlers/queue.ts`.
 
+OAuth: `GET /api/oauth/tiktok/start` and `/callback`. Tokens stored in `token_blobs` via `EncryptedD1TokenStore`.
+
+Media: video bytes in R2; D1 `media` row per content. Publish resolves video by `scheduledPost.contentId`.
+
 ## Lifecycle
 
 ```text

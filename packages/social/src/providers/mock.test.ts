@@ -31,6 +31,7 @@ const input = {
     contentId: 'c1',
     socialAccountId: 'a1',
     scheduledAt: new Date(),
+    privacyLevel: 'self_only' as const,
     status: 'publishing' as const,
     publishedAt: null,
     externalPostId: null,
@@ -42,6 +43,7 @@ const input = {
     updatedAt: new Date(),
   },
   idempotencyKey: 'post-1',
+  caption: 'Caption',
 };
 
 describe('MockTikTokPublisher', () => {
