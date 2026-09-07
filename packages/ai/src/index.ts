@@ -2,6 +2,7 @@ export * from './providers/factory.js';
 export * from './agents/types.js';
 export * from './agents/content-agent.js';
 export * from './generators/affiliate-content-generator.js';
+export * from './generators/affiliate-cover-media-generator.js';
 export * from './prompts/affiliate-prompt.js';
 export * from './tools/index.js';
 export * from './prompts/content.js';

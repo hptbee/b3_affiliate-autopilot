@@ -48,20 +48,24 @@ export const contents = sqliteTable(
   (table) => [index('contents_user_status_idx').on(table.userId, table.status)],
 );
 
-export const media = sqliteTable('media', {
-  id: text('id').primaryKey(),
-  contentId: text('content_id')
-    .notNull()
-    .references(() => contents.id),
-  bucket: text('bucket').notNull(),
-  key: text('key').notNull(),
-  mediaType: text('media_type').notNull(),
-  mimeType: text('mime_type').notNull(),
-  size: integer('size').notNull(),
-  duration: integer('duration'),
-  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-});
+export const media = sqliteTable(
+  'media',
+  {
+    id: text('id').primaryKey(),
+    contentId: text('content_id')
+      .notNull()
+      .references(() => contents.id),
+    bucket: text('bucket').notNull(),
+    key: text('key').notNull(),
+    mediaType: text('media_type').notNull(),
+    mimeType: text('mime_type').notNull(),
+    size: integer('size').notNull(),
+    duration: integer('duration'),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('media_content_id_idx').on(table.contentId)],
+);
 
 export const scheduledPosts = sqliteTable(
   'scheduled_posts',

@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'AI_PROVIDER_ERROR'
   | 'SOCIAL_PUBLISH_ERROR'
   | 'AFFILIATE_PROVIDER_ERROR'
+  | 'MEDIA_GENERATION_ERROR'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR';
 
@@ -120,4 +121,37 @@ function statusForAffiliateKind(kind: AffiliateProviderErrorKind): number {
 
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
+}
+
+export type MediaGenerationErrorKind =
+  | 'generation'
+  | 'invalid'
+  | 'timeout'
+  | 'unavailable'
+  | 'storage'
+  | 'unknown';
+
+export class MediaGenerationError extends AppError {
+  constructor(
+    message: string,
+    public readonly kind: MediaGenerationErrorKind,
+    details?: Record<string, unknown>,
+  ) {
+    super('MEDIA_GENERATION_ERROR', message, statusForMediaKind(kind), details);
+  }
+}
+
+function statusForMediaKind(kind: MediaGenerationErrorKind): number {
+  switch (kind) {
+    case 'invalid':
+      return 400;
+    case 'unavailable':
+      return 503;
+    case 'timeout':
+      return 504;
+    case 'storage':
+      return 502;
+    default:
+      return 502;
+  }
 }
