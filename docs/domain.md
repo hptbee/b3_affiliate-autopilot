@@ -1,6 +1,6 @@
 # Domain model (conceptual)
 
-Phase 0 establishes boundaries. These types exist in `packages/core` as TypeScript contracts. **Do not treat this as a locked D1 schema.** Persistence for Product and AffiliateOffer is Phase 1.
+Phase 1 persists Product and AffiliateOffer in D1. See [research/shopee-affiliate.md](./research/shopee-affiliate.md). Owner-scoped uniqueness is `(userId, provider, externalProductId)`. `description` and `originalPrice` are nullable because Shopee `productOfferV2` does not document them.
 
 ## Core chain
 
@@ -15,6 +15,7 @@ A listing discovered or imported from an affiliate provider. Shopee is the first
 ```text
 Product
 ├── id
+├── userId
 ├── provider              # e.g. shopee
 ├── externalProductId
 ├── title
@@ -35,6 +36,7 @@ The monetization relationship for a product. Product URL ≠ affiliate URL.
 ```text
 AffiliateOffer
 ├── id
+├── userId
 ├── productId
 ├── provider
 ├── affiliateUrl          # tracking / commission link

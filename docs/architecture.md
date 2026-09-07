@@ -18,7 +18,7 @@ Route (Hono) → Zod → UserContext → application command → repository → 
 
 Business logic lives in `packages/core`. Provider HTTP belongs in adapters:
 
-- Affiliate HTTP (Shopee) — not implemented; Phase 1 after API verification
+- Affiliate HTTP (Shopee) — `packages/affiliate` GraphQL adapter; live calls need approved App ID/Secret
 - Distribution HTTP (Facebook, later TikTok) — `packages/social` mocks only
 - Media bytes belong in R2
 
@@ -102,6 +102,6 @@ The media / TTS / renderer pipeline is Phase 3. Do not implement it here.
 
 ## Affiliate vs distribution
 
-Product URL and affiliate URL are different fields. Distribution adapters receive an already-resolved `AffiliateOffer.affiliateUrl`; they must not invent tracking links.
+Product URL and affiliate URL are different fields. Shopee `productLink` maps to `Product.productUrl`; `offerLink` / `generateShortLink` map to `AffiliateOffer.affiliateUrl`. Identity is `(provider, externalProductId)` — never the affiliate URL.
 
 TikTok-specific HTTP, OAuth, and error mapping stay under `packages/social/src/tiktok/` as future work. Facebook-specific details stay under `packages/social/src/facebook/`.

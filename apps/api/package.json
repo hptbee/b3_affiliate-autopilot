@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@social-autopilot/affiliate": "workspace:*",
     "@social-autopilot/ai": "workspace:*",
     "@social-autopilot/core": "workspace:*",
     "@social-autopilot/database": "workspace:*",

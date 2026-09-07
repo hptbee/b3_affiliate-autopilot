@@ -35,7 +35,7 @@ Shopee product → AffiliateOffer → AI content → approval → media (later)
 
 Extensibility remains via ports (`AffiliateProvider`, `SocialPublisher`, `AIProvider`) — not a multi-platform product yet.
 
-**Next implementation step: Phase 1 — verify current Shopee Affiliate/API capabilities.** Do not implement Shopee, Facebook, or TikTok HTTP/OAuth in the same change as this direction update.
+**Next implementation step: obtain Vietnam Shopee Affiliate Open API credentials and confirm the live GraphQL schema.** Do not start Phase 2 until one real import succeeds.
 
 ---
 
@@ -62,7 +62,7 @@ flowchart TD
 
 **Runtime:** `apps/api` handles `fetch` + `scheduled` + `queue`.
 
-Product and AffiliateOffer exist as domain types. Persistence and provider HTTP are Phase 1.
+Product and AffiliateOffer persist in D1. Shopee HTTP lives in `packages/affiliate`. Live GraphQL still needs App ID approval.
 
 ---
 
@@ -87,7 +87,7 @@ Reuse this foundation. Do not redesign scheduling, locks, or queues without a co
 
 ## 4. Problems found (remaining)
 
-- No Product / AffiliateOffer persistence yet (Phase 1)
+- Live Shopee GraphQL still requires an approved Open API App ID/Secret
 - `TokenStore` is an interface only — no encryption yet (Phase 4 Facebook OAuth)
 - In-memory rate limiter is not a production control
 - AI generate is not an HTTP route yet (Phase 2)
@@ -119,12 +119,13 @@ One Worker, D1, R2, one Queue, Cron, Secrets, optional Workers AI / OpenAI.
 packages/core       commands + domain (Product, AffiliateOffer, Content, MediaAsset, Distribution)
 packages/ai         affiliate draft schema + providers
 packages/social     SocialPublisher port + mock adapters; later facebook/* and tiktok/*
+packages/affiliate  Shopee GraphQL adapter (capability ports in core)
 packages/database   Drizzle only
 apps/api            composition root + fetch/scheduled/queue
 apps/web            dashboard
 ```
 
-Future affiliate adapters (not a package yet): Shopee first, behind an `AffiliateProvider` port.
+Shopee is the only affiliate adapter in this phase. Extra providers are not implemented.
 
 ```text
                     Dashboard
@@ -317,7 +318,19 @@ Planned:
 - Provider-specific error handling
 - Configuration/secrets design
 
-**Before implementing the real integration:** verify current Shopee Affiliate/API capabilities, authentication, link generation, quotas, and policy constraints. Do not assume an API exists or works in a particular way.
+**This phase is complete.** Research: [shopee-affiliate.md](./research/shopee-affiliate.md).
+
+Implemented:
+
+- Capability ports `ProductDiscovery` / `AffiliateLinkGenerator` (`AffiliateNetwork`)
+- Shopee GraphQL adapter (`productOfferV2`, `generateShortLink`)
+- D1 `products` + `affiliate_offers`
+- Import vertical slice API
+- Worker secrets for App ID / Secret
+
+Not implemented (unverified or later): conversion reports, live calls in unit tests, Facebook, TikTok, AI.
+
+Live GraphQL still **REQUIRES APPROVAL** (`10035` without Open API access).
 
 ### Phase 2 — AI Affiliate Content
 
