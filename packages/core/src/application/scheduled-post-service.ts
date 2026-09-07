@@ -5,6 +5,7 @@ import {
   MAX_PUBLISH_RETRIES,
 } from '../domain/scheduled-post.js';
 import type { SocialAccount } from '../domain/social-account.js';
+import { isSocialPlatform } from '../domain/social-account.js';
 import type { UserContext } from '../types/user-context.js';
 import { ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
 import type { ContentRepository } from './content-service.js';
@@ -60,8 +61,8 @@ export class ScheduledPostService {
       throw new NotFoundError('SocialAccount', input.socialAccountId);
     }
 
-    if (account.platform !== 'tiktok') {
-      throw new ValidationError('MVP only supports TikTok accounts');
+    if (!isSocialPlatform(account.platform)) {
+      throw new ValidationError(`Unsupported distribution channel: ${account.platform}`);
     }
 
     if (input.scheduledAt.getTime() <= Date.now()) {

@@ -1,3 +1,7 @@
+/**
+ * Distribution job. Publishing status lives here, not on Content.
+ * Channel is the linked SocialAccount (Facebook first; TikTok future).
+ */
 export const SCHEDULED_POST_STATUSES = [
   'scheduled',
   'publishing',

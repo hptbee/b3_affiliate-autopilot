@@ -5,7 +5,7 @@ export function SettingsPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold">Settings</h2>
-        <p className="text-muted-foreground">TikTok autopilot configuration</p>
+        <p className="text-muted-foreground">Affiliate autopilot configuration</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -33,7 +33,7 @@ export function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Authentication</CardTitle>
-            <CardDescription>Coming in Phase 5</CardDescription>
+            <CardDescription>Out of MVP</CardDescription>
           </CardHeader>
           <p className="text-sm text-muted-foreground">
             Multi-user identity is out of MVP. Requests already use a UserContext (bootstrap user).
