@@ -1,4 +1,5 @@
 import type { ContentService, UserContext } from '@social-autopilot/core';
+import { mapAffiliateDraftToContentFields } from '@social-autopilot/core';
 import type { AIProvider } from '../providers/types.js';
 import { AFFILIATE_DRAFT_SYSTEM_PROMPT } from '../prompts/content.js';
 import { affiliateContentDraftSchema } from '../prompts/affiliate-draft.js';
@@ -55,16 +56,14 @@ export class ContentAgent {
         schema: affiliateContentDraftSchema,
       });
 
-      const title = draft.hook;
-      const body = [
-        draft.script,
-        draft.caption,
-        draft.cta,
-        (draft.hashtags ?? []).join(' '),
-        draft.videoScenePlan,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+      const { title, body } = mapAffiliateDraftToContentFields({
+        hook: draft.hook,
+        script: draft.script,
+        caption: draft.caption,
+        cta: draft.cta,
+        hashtags: draft.hashtags ?? [],
+        videoScenePlan: draft.videoScenePlan,
+      });
 
       const content = await this.contentService.create(user, {
         title,

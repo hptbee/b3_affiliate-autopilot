@@ -178,4 +178,15 @@ describe('ProductService', () => {
       AffiliateProviderError,
     );
   });
+
+  it('loads an offer scoped to product and owner', async () => {
+    const { productRepository, offerRepository } = createRepos();
+    const service = new ProductService(productRepository, offerRepository, mockNetwork([discovered()]));
+    const imported = await service.importProduct(user, { keyword: 'widget' });
+    const offer = await service.getOfferById(user, imported.product.id, imported.offer!.id);
+    expect(offer.affiliateUrl).toBe('https://shope.ee/offer');
+    await expect(
+      service.getOfferById(other, imported.product.id, imported.offer!.id),
+    ).rejects.toThrow('Product not found');
+  });
 });

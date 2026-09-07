@@ -20,7 +20,16 @@ const updateContentSchema = z
   })
   .strict();
 
-export { createContentSchema, updateContentSchema };
+const generateContentSchema = z
+  .object({
+    productId: z.string().min(1),
+    affiliateOfferId: z.string().min(1).optional(),
+    tone: z.string().min(1).max(64).optional(),
+    language: z.string().min(1).max(16).optional(),
+  })
+  .strict();
+
+export { createContentSchema, updateContentSchema, generateContentSchema };
 
 export const contentRoutes = new Hono<HonoEnv>();
 
@@ -40,6 +49,17 @@ contentRoutes.post('/', async (c) => {
     const { contentService } = getServices(c);
     const content = await contentService.create(getUser(c), body);
     return c.json({ data: content }, 201);
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.post('/generate', async (c) => {
+  try {
+    const body = generateContentSchema.parse(await c.req.json());
+    const { affiliateContentService } = getServices(c);
+    const result = await affiliateContentService.generateDraft(getUser(c), body);
+    return c.json({ data: result }, 201);
   } catch (error) {
     return handleError(c, error);
   }
