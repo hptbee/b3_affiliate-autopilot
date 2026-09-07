@@ -9,6 +9,7 @@ import {
 import { contentRoutes } from './routes/content.js';
 import { scheduledPostRoutes } from './routes/scheduled-posts.js';
 import { socialAccountRoutes } from './routes/social-accounts.js';
+import { productRoutes } from './routes/products.js';
 import type { HonoEnv } from './lib/errors.js';
 import type { Env } from '../worker-configuration.js';
 
@@ -29,6 +30,7 @@ app.get('/health', (c) =>
 );
 
 app.route('/api/content', contentRoutes);
+app.route('/api/products', productRoutes);
 app.route('/api/scheduled-posts', scheduledPostRoutes);
 app.route('/api/social-accounts', socialAccountRoutes);
 

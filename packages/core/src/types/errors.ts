@@ -7,6 +7,8 @@ export type ErrorCode =
   | 'EXTERNAL_SERVICE_ERROR'
   | 'AI_PROVIDER_ERROR'
   | 'SOCIAL_PUBLISH_ERROR'
+  | 'AFFILIATE_PROVIDER_ERROR'
+  | 'RATE_LIMITED'
   | 'INTERNAL_ERROR';
 
 export class AppError extends Error {
@@ -72,6 +74,47 @@ export class SocialPublishError extends AppError {
     details?: Record<string, unknown>,
   ) {
     super('SOCIAL_PUBLISH_ERROR', message, 502, details);
+  }
+}
+
+export type AffiliateProviderErrorKind =
+  | 'authentication'
+  | 'rate_limit'
+  | 'not_found'
+  | 'invalid'
+  | 'malformed'
+  | 'unavailable'
+  | 'unknown';
+
+export class AffiliateProviderError extends AppError {
+  constructor(
+    message: string,
+    public readonly kind: AffiliateProviderErrorKind,
+    details?: Record<string, unknown>,
+  ) {
+    super(
+      kind === 'rate_limit' ? 'RATE_LIMITED' : 'AFFILIATE_PROVIDER_ERROR',
+      message,
+      statusForAffiliateKind(kind),
+      details,
+    );
+  }
+}
+
+function statusForAffiliateKind(kind: AffiliateProviderErrorKind): number {
+  switch (kind) {
+    case 'authentication':
+      return 401;
+    case 'rate_limit':
+      return 429;
+    case 'not_found':
+      return 404;
+    case 'invalid':
+      return 400;
+    case 'unavailable':
+      return 503;
+    default:
+      return 502;
   }
 }
 

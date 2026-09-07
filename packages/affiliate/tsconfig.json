@@ -1,0 +1,9 @@
+{
+  "extends": "@social-autopilot/config/typescript/base",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/**/*"]
+}

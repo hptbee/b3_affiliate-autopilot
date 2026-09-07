@@ -7,4 +7,7 @@ export interface Env {
   AI_PROVIDER: string;
   OPENAI_API_KEY?: string;
   CORS_ORIGIN?: string;
+  SHOPEE_AFFILIATE_APP_ID?: string;
+  SHOPEE_AFFILIATE_SECRET?: string;
+  SHOPEE_AFFILIATE_ENDPOINT?: string;
 }

@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -89,8 +89,65 @@ export const scheduledPosts = sqliteTable(
   ],
 );
 
+export const products = sqliteTable(
+  'products',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    provider: text('provider').notNull(),
+    externalProductId: text('external_product_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    price: text('price'),
+    originalPrice: text('original_price'),
+    rating: text('rating'),
+    salesCount: integer('sales_count'),
+    images: text('images', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    productUrl: text('product_url').notNull(),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('products_user_provider_external_idx').on(
+      table.userId,
+      table.provider,
+      table.externalProductId,
+    ),
+    index('products_user_provider_idx').on(table.userId, table.provider),
+  ],
+);
+
+export const affiliateOffers = sqliteTable(
+  'affiliate_offers',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    provider: text('provider').notNull(),
+    affiliateUrl: text('affiliate_url').notNull(),
+    trackingCode: text('tracking_code'),
+    commissionRate: text('commission_rate'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    uniqueIndex('affiliate_offers_product_url_idx').on(table.productId, table.affiliateUrl),
+    index('affiliate_offers_user_idx').on(table.userId),
+    index('affiliate_offers_product_idx').on(table.productId),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type SocialAccountRow = typeof socialAccounts.$inferSelect;
 export type ContentRow = typeof contents.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 export type ScheduledPostRow = typeof scheduledPosts.$inferSelect;
+export type ProductRow = typeof products.$inferSelect;
+export type AffiliateOfferRow = typeof affiliateOffers.$inferSelect;

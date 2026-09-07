@@ -2,7 +2,7 @@
 
 An affiliate-first content automation platform built on Cloudflare.
 
-**Status:** v0.1 foundation — Phase 0 domain refactor. Shopee is the first affiliate provider. Facebook is the first distribution target. TikTok is a **PENDING / FUTURE** distribution channel. No live Shopee, Facebook, or TikTok APIs yet.
+**Status:** v0.1 — Phase 1 Shopee Affiliate foundation. Shopee is the first affiliate provider. Facebook is the first distribution target. TikTok is a **PENDING / FUTURE** distribution channel. Live Shopee GraphQL runs only when Worker secrets are configured. No Facebook or TikTok APIs.
 
 ## Product
 
@@ -63,7 +63,7 @@ TikTok remains an additional future distribution adapter on the same `SocialPubl
 9. Publishing is idempotent
 10. Failed / uncertain publishing is handled safely
 
-This repo is **not** at MVP yet. Next implementation step is **Phase 1: verify Shopee Affiliate/API capabilities**, then the Shopee provider abstraction. Do not implement live Shopee, Facebook, or TikTok integrations in this phase.
+This repo is **not** at MVP yet. Phase 1 is in: import a Shopee offer into `Product` + `AffiliateOffer`. Next: obtain Vietnam Open API access and confirm the live GraphQL schema, then Phase 2 AI content.
 
 ## Cloudflare architecture
 
@@ -104,7 +104,7 @@ Facebook    TikTok
 | R2 | Media assets (images, audio, video, thumbnails). Metadata stays in D1 |
 | Queues | `{ scheduledPostId }` distribution jobs |
 | Cron | Find due posts, claim `queuedAt`, enqueue |
-| Worker Secrets | `OPENAI_API_KEY`; later Shopee / Facebook secrets + `TOKEN_WRAP_KEY` |
+| Worker Secrets | `OPENAI_API_KEY`; Shopee `SHOPEE_AFFILIATE_APP_ID` + `SHOPEE_AFFILIATE_SECRET`; later Facebook secrets + `TOKEN_WRAP_KEY` |
 | Workers AI | Default generate in development |
 | OpenAI | Optional structured-generation provider |
 
@@ -161,6 +161,8 @@ wrangler queues create social-autopilot-publish-dlq
 cd apps/api
 wrangler d1 migrations apply social-autopilot-db --remote
 wrangler secret put OPENAI_API_KEY --env production
+wrangler secret put SHOPEE_AFFILIATE_APP_ID --env production
+wrangler secret put SHOPEE_AFFILIATE_SECRET --env production
 ```
 
 Fill real `database_id` values in `wrangler.jsonc`. Resources are not created automatically.
@@ -181,10 +183,15 @@ Fill real `database_id` values in `wrangler.jsonc`. Resources are not created au
 | POST | `/api/scheduled-posts` | Schedule approved content |
 | POST | `/api/scheduled-posts/:id/cancel` | Cancel job |
 | GET | `/api/social-accounts` | List distribution accounts (no tokens) |
+| POST | `/api/products/search` | Discover Shopee offers (no persist) |
+| POST | `/api/products/import` | Persist Product + AffiliateOffer |
+| GET | `/api/products` | List imported products |
+| GET | `/api/products/:id` | Product + offers (owner only) |
+| POST | `/api/products/:id/affiliate-offer` | Generate a tracked affiliate link |
 
 `userId` is never taken from the request body. `UserContext` is set in middleware (bootstrap user today).
 
-Product, AffiliateOffer, and media-upload HTTP APIs are not in this phase.
+Shopee HTTP is not called unless Worker secrets are set. Media-upload HTTP is not in this phase.
 
 ## Commands
 
@@ -204,8 +211,8 @@ Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, ow
 
 See [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md).
 
-- **Phase 0** — Architecture & domain refactor (this change)
-- **Phase 1** — Shopee Affiliate foundation (verify API first)
+- **Phase 0** — Architecture & domain refactor (complete)
+- **Phase 1** — Shopee Affiliate foundation (this change; live API still needs App ID approval)
 - **Phase 2** — AI affiliate content
 - **Phase 3** — Media / video pipeline
 - **Phase 4** — Facebook distribution (verify Meta API first)
