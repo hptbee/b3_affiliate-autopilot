@@ -1,4 +1,5 @@
-import { createAIProvider } from '@social-autopilot/ai';
+import { createAIProvider, createAffiliateContentGenerator } from '@social-autopilot/ai';
+import { AffiliateContentService } from '@social-autopilot/core';
 import { createServices, CloudflarePublishQueue } from '@social-autopilot/database';
 import { createSocialPublishers } from '@social-autopilot/social';
 import { createShopeeAffiliateNetwork } from '@social-autopilot/affiliate';
@@ -26,7 +27,14 @@ export function createAppContext(env: Env) {
     workersAiBinding: env.AI,
   });
 
-  return { ...services, aiProvider };
+  const affiliateContentGenerator = createAffiliateContentGenerator(aiProvider);
+  const affiliateContentService = new AffiliateContentService(
+    services.productService,
+    services.contentService,
+    affiliateContentGenerator,
+  );
+
+  return { ...services, aiProvider, affiliateContentService };
 }
 
 export type AppContext = ReturnType<typeof createAppContext>;

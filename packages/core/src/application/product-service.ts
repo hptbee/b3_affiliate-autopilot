@@ -86,6 +86,19 @@ export class ProductService {
     return this.offerRepository.findByUserId(user.userId);
   }
 
+  async getOfferById(
+    user: UserContext,
+    productId: string,
+    offerId: string,
+  ): Promise<AffiliateOffer> {
+    await this.getById(user, productId);
+    const offer = await this.offerRepository.findById(offerId);
+    if (!offer || offer.userId !== user.userId || offer.productId !== productId) {
+      throw new NotFoundError('AffiliateOffer', offerId);
+    }
+    return offer;
+  }
+
   async createOffer(
     user: UserContext,
     productId: string,
