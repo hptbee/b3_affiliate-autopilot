@@ -19,6 +19,8 @@ export * from './types/publishing.js';
 export * from './domain/affiliate-link-validation.js';
 export * from './application/affiliate-product-selection-service.js';
 export * from './application/affiliate-content-pipeline-service.js';
+export * from './types/pipeline-lock.js';
+export * from './application/affiliate-pipeline-scheduler-service.js';
 
 export * from './application/content-service.js';
 export * from './application/affiliate-content-service.js';

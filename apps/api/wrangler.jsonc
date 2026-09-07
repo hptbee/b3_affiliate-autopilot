@@ -9,12 +9,16 @@
     "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "0 2 * * *"]
   },
   "vars": {
     "ENVIRONMENT": "development",
     "AI_PROVIDER": "workers-ai",
-    "CORS_ORIGIN": "http://localhost:5173"
+    "CORS_ORIGIN": "http://localhost:5173",
+    "AFFILIATE_PIPELINE_CRON": "0 2 * * *",
+    "AFFILIATE_PIPELINE_ENABLED": "true",
+    "AFFILIATE_PIPELINE_INTERVAL_HOURS": "24",
+    "AFFILIATE_PIPELINE_LIMIT": "5"
   },
   "d1_databases": [
     {
@@ -53,12 +57,16 @@
     "staging": {
       "name": "social-autopilot-api-staging",
       "triggers": {
-        "crons": ["*/5 * * * *"]
+        "crons": ["*/5 * * * *", "0 2 * * *"]
       },
       "vars": {
         "ENVIRONMENT": "staging",
         "AI_PROVIDER": "workers-ai",
-        "CORS_ORIGIN": "https://staging.example.com"
+        "CORS_ORIGIN": "https://staging.example.com",
+        "AFFILIATE_PIPELINE_CRON": "0 2 * * *",
+        "AFFILIATE_PIPELINE_ENABLED": "true",
+        "AFFILIATE_PIPELINE_INTERVAL_HOURS": "24",
+        "AFFILIATE_PIPELINE_LIMIT": "5"
       },
       "d1_databases": [
         {
@@ -94,12 +102,16 @@
     "production": {
       "name": "social-autopilot-api",
       "triggers": {
-        "crons": ["*/5 * * * *"]
+        "crons": ["*/5 * * * *", "0 2 * * *"]
       },
       "vars": {
         "ENVIRONMENT": "production",
         "AI_PROVIDER": "openai",
-        "CORS_ORIGIN": "https://app.example.com"
+        "CORS_ORIGIN": "https://app.example.com",
+        "AFFILIATE_PIPELINE_CRON": "0 2 * * *",
+        "AFFILIATE_PIPELINE_ENABLED": "true",
+        "AFFILIATE_PIPELINE_INTERVAL_HOURS": "24",
+        "AFFILIATE_PIPELINE_LIMIT": "5"
       },
       "d1_databases": [
         {

@@ -2,14 +2,17 @@ import { createAIProvider, createAffiliateContentGenerator, createAffiliateCover
 import {
   AffiliateContentPipelineService,
   AffiliateContentService,
+  AffiliatePipelineSchedulerService,
   AffiliateProductSelectionService,
   MediaService,
+  parseAffiliatePipelineScheduleConfig,
 } from '@social-autopilot/core';
 import {
   createDatabase,
   createServices,
   CloudflarePublishQueue,
   DrizzleMediaRepository,
+  DrizzlePipelineLockRepository,
   EncryptedTokenStore,
   R2MediaStorage,
 } from '@social-autopilot/database';
@@ -82,11 +85,20 @@ export function createAppContext(env: Env) {
     mediaService,
   );
 
+  const pipelineLockRepository = new DrizzlePipelineLockRepository(database);
+  const affiliatePipelineSchedulerService = new AffiliatePipelineSchedulerService(
+    affiliateContentPipelineService,
+    pipelineLockRepository,
+    services.logger,
+    parseAffiliatePipelineScheduleConfig(env),
+  );
+
   return {
     ...services,
     aiProvider,
     affiliateContentService,
     affiliateContentPipelineService,
+    affiliatePipelineSchedulerService,
     mediaService,
     tokenStore,
   };

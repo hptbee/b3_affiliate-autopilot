@@ -12,6 +12,7 @@ export * from './repositories/social-account-repository.js';
 export * from './repositories/product-repository.js';
 export * from './repositories/affiliate-offer-repository.js';
 export * from './repositories/media-repository.js';
+export * from './repositories/pipeline-lock-repository.js';
 export * from './container.js';
 export * from './storage/r2-media-storage.js';
 export * from './queue/cloudflare-queue.js';

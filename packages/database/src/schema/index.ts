@@ -75,6 +75,18 @@ export const media = sqliteTable(
   (table) => [index('media_content_id_idx').on(table.contentId)],
 );
 
+export const pipelineJobLocks = sqliteTable('pipeline_job_locks', {
+  jobName: text('job_name').primaryKey(),
+  status: text('status').notNull().default('idle'),
+  ownerId: text('owner_id'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  leaseExpiresAt: integer('lease_expires_at', { mode: 'timestamp' }),
+  lastCompletedAt: integer('last_completed_at', { mode: 'timestamp' }),
+  lastResult: text('last_result', { mode: 'json' }).$type<Record<string, unknown>>(),
+  lastError: text('last_error'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const scheduledPosts = sqliteTable(
   'scheduled_posts',
   {
