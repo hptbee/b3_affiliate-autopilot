@@ -6,9 +6,8 @@ import { ScheduledPostService } from '../application/scheduled-post-service.js';
 import type { ContentRepository } from '../application/content-service.js';
 import type {
   ScheduledPostRepository,
+  SocialAccountRepository,
 } from '../application/scheduled-post-service.js';
-import type { SocialAccountRepository } from '../application/social-account-repository.js';
-import type { MediaRepository } from '../application/media-service.js';
 import { ConflictError } from '../types/errors.js';
 import { filterDuePosts } from '../application/scheduler-service.js';
 
@@ -23,7 +22,6 @@ function createScheduledPost(overrides: Partial<ScheduledPost> = {}): ScheduledP
     contentId: 'content-1',
     socialAccountId: 'account-1',
     scheduledAt: future,
-    privacyLevel: 'self_only',
     status: 'scheduled',
     publishedAt: null,
     externalPostId: null,
@@ -45,6 +43,7 @@ function createContent(overrides: Partial<Content> = {}): Content {
     body: 'Body',
     status: 'approved',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -55,7 +54,7 @@ function createAccount(overrides: Partial<SocialAccount> = {}): SocialAccount {
   return {
     id: 'account-1',
     userId: 'user-1',
-    platform: 'tiktok',
+    platform: 'facebook',
     externalAccountId: 'ext-1',
     displayName: 'Test Account',
     accessTokenRef: 'token-ref',
@@ -73,7 +72,6 @@ function createServices(
   content = createContent(),
   scheduledPost = createScheduledPost(),
   account = createAccount(),
-  options: { hasMedia?: boolean } = { hasMedia: true },
 ) {
   const scheduledPosts = new Map([[scheduledPost.id, { ...scheduledPost }]]);
   const extraPosts: ScheduledPost[] = [];
@@ -82,6 +80,16 @@ function createServices(
     async create(input) {
       const post = createScheduledPost({
         id: `post-new-${scheduledPosts.size}`,
+        ...input,
+      });
+      scheduledPosts.set(post.id, post);
+      extraPosts.push(post);
+      return post;
+    },
+    async createImmediate(input) {
+      const post = createScheduledPost({
+        id: `post-immediate-${scheduledPosts.size}`,
+        scheduledAt: new Date(),
         ...input,
       });
       scheduledPosts.set(post.id, post);
@@ -167,6 +175,9 @@ function createServices(
     async findByUserId() {
       return [...contentStore.values()];
     },
+    async findRecentByAffiliateOffer() {
+      return [];
+    },
     async update(id, input) {
       const existing = contentStore.get(id)!;
       const updated = { ...existing, ...input };
@@ -189,40 +200,13 @@ function createServices(
     async findByUserId() {
       return [account];
     },
-    async findByUserAndPlatform() {
+    async findByUserPlatformExternal() {
+      return null;
+    },
+    async upsert() {
       return account;
     },
-    async upsertByUserAndPlatform() {
-      return account;
-    },
-    async updateTokens() {
-      return account;
-    },
-    async disconnect() {
-      return { ...account, status: 'disconnected' };
-    },
-  };
-
-  const mediaRepository: MediaRepository = {
-    async findByContentId(contentId) {
-      if (!options.hasMedia || contentId !== content.id) return null;
-      return {
-        id: 'media-1',
-        contentId,
-        bucket: 'social-autopilot-media',
-        key: `users/${content.userId}/content/${contentId}/media-1.mp4`,
-        mediaType: 'video',
-        mimeType: 'video/mp4',
-        size: 1024,
-        duration: null,
-        metadata: {},
-        createdAt: new Date(),
-      };
-    },
-    async create() {
-      throw new Error('not implemented');
-    },
-    async deleteByContentId() {},
+    async delete() {},
   };
 
   return {
@@ -230,7 +214,6 @@ function createServices(
       scheduledPostRepository,
       contentRepository,
       socialAccountRepository,
-      mediaRepository,
     ),
     scheduledPosts,
     contentStore,
@@ -246,19 +229,6 @@ describe('ScheduledPostService', () => {
       scheduledAt: future,
     });
     expect(post.status).toBe('scheduled');
-  });
-
-  it('cannot schedule without uploaded video', async () => {
-    const { service } = createServices(createContent(), createScheduledPost(), createAccount(), {
-      hasMedia: false,
-    });
-    await expect(
-      service.create(user, {
-        contentId: 'content-1',
-        socialAccountId: 'account-1',
-        scheduledAt: future,
-      }),
-    ).rejects.toThrow('uploaded video');
   });
 
   it('cannot schedule draft content', async () => {
@@ -336,6 +306,20 @@ describe('ScheduledPostService', () => {
     });
     expect(first.id).not.toBe(second.id);
     expect(first.contentId).toBe(second.contentId);
+  });
+
+  it('can schedule to a TikTok account as a future distribution channel', async () => {
+    const { service } = createServices(
+      createContent(),
+      createScheduledPost(),
+      createAccount({ platform: 'tiktok' }),
+    );
+    const post = await service.create(user, {
+      contentId: 'content-1',
+      socialAccountId: 'account-1',
+      scheduledAt: future,
+    });
+    expect(post.status).toBe('scheduled');
   });
 });
 

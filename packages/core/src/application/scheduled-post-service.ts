@@ -4,22 +4,26 @@ import {
   isPublishable,
   MAX_PUBLISH_RETRIES,
 } from '../domain/scheduled-post.js';
-import type { ScheduledPostPrivacyLevel } from '../domain/scheduled-post.js';
+import type { SocialAccount, SocialPlatform, SocialAccountStatus } from '../domain/social-account.js';
+import { isSocialPlatform } from '../domain/social-account.js';
 import type { UserContext } from '../types/user-context.js';
 import { ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
 import type { ContentRepository } from './content-service.js';
-import type { MediaRepository } from './media-service.js';
-import type { SocialAccountRepository } from './social-account-repository.js';
 
 export interface CreateScheduledPostInput {
   contentId: string;
   socialAccountId: string;
   scheduledAt: Date;
-  privacyLevel?: ScheduledPostPrivacyLevel;
+}
+
+export interface CreateImmediateScheduledPostInput {
+  contentId: string;
+  socialAccountId: string;
 }
 
 export interface ScheduledPostRepository {
   create(input: CreateScheduledPostInput): Promise<ScheduledPost>;
+  createImmediate(input: CreateImmediateScheduledPostInput): Promise<ScheduledPost>;
   findById(id: string): Promise<ScheduledPost | null>;
   findByUserId(userId: string): Promise<ScheduledPost[]>;
   findByContentId(contentId: string): Promise<ScheduledPost[]>;
@@ -34,12 +38,35 @@ export interface ScheduledPostRepository {
   reclaimStalePublishing(now: Date, leaseMs: number): Promise<number>;
 }
 
+export interface UpsertSocialAccountInput {
+  userId: string;
+  platform: SocialPlatform;
+  externalAccountId: string;
+  displayName: string;
+  accessTokenRef: string;
+  refreshTokenRef: string | null;
+  tokenExpiresAt: Date | null;
+  metadata: Record<string, unknown>;
+  status: SocialAccountStatus;
+}
+
+export interface SocialAccountRepository {
+  findById(id: string): Promise<SocialAccount | null>;
+  findByUserId(userId: string): Promise<SocialAccount[]>;
+  findByUserPlatformExternal(
+    userId: string,
+    platform: SocialPlatform,
+    externalAccountId: string,
+  ): Promise<SocialAccount | null>;
+  upsert(input: UpsertSocialAccountInput): Promise<SocialAccount>;
+  delete(id: string): Promise<void>;
+}
+
 export class ScheduledPostService {
   constructor(
     private readonly scheduledPostRepository: ScheduledPostRepository,
     private readonly contentRepository: ContentRepository,
     private readonly socialAccountRepository: SocialAccountRepository,
-    private readonly mediaRepository: MediaRepository,
   ) {}
 
   async create(user: UserContext, input: CreateScheduledPostInput): Promise<ScheduledPost> {
@@ -59,17 +86,12 @@ export class ScheduledPostService {
       throw new NotFoundError('SocialAccount', input.socialAccountId);
     }
 
-    if (account.platform !== 'tiktok') {
-      throw new ValidationError('MVP only supports TikTok accounts');
+    if (!isSocialPlatform(account.platform)) {
+      throw new ValidationError(`Unsupported distribution channel: ${account.platform}`);
     }
 
     if (input.scheduledAt.getTime() <= Date.now()) {
       throw new ValidationError('Scheduled time must be in the future');
-    }
-
-    const media = await this.mediaRepository.findByContentId(input.contentId);
-    if (!media) {
-      throw new ConflictError('Content must have an uploaded video before scheduling');
     }
 
     return this.scheduledPostRepository.create(input);

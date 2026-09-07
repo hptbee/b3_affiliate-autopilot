@@ -38,6 +38,9 @@ function createSchedulerService(options: {
     async create() {
       throw new Error('not implemented');
     },
+    async createImmediate() {
+      throw new Error('not implemented');
+    },
     async findById() {
       return null;
     },

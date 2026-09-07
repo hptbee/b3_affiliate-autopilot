@@ -1,9 +1,16 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const tokenVault = sqliteTable('token_vault', {
+  ref: text('ref').primaryKey(),
+  ciphertext: text('ciphertext').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -42,26 +49,98 @@ export const contents = sqliteTable(
     body: text('body').notNull(),
     status: text('status').notNull().default('draft'),
     contentType: text('content_type').notNull().default('video'),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
   (table) => [index('contents_user_status_idx').on(table.userId, table.status)],
 );
 
-export const media = sqliteTable('media', {
-  id: text('id').primaryKey(),
-  contentId: text('content_id')
-    .notNull()
-    .references(() => contents.id),
-  bucket: text('bucket').notNull(),
-  key: text('key').notNull(),
-  mediaType: text('media_type').notNull(),
-  mimeType: text('mime_type').notNull(),
-  size: integer('size').notNull(),
-  duration: integer('duration'),
-  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+export const media = sqliteTable(
+  'media',
+  {
+    id: text('id').primaryKey(),
+    contentId: text('content_id')
+      .notNull()
+      .references(() => contents.id),
+    bucket: text('bucket').notNull(),
+    key: text('key').notNull(),
+    mediaType: text('media_type').notNull(),
+    mimeType: text('mime_type').notNull(),
+    size: integer('size').notNull(),
+    duration: integer('duration'),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [index('media_content_id_idx').on(table.contentId)],
+);
+
+export const pipelineJobLocks = sqliteTable('pipeline_job_locks', {
+  jobName: text('job_name').primaryKey(),
+  status: text('status').notNull().default('idle'),
+  ownerId: text('owner_id'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  leaseExpiresAt: integer('lease_expires_at', { mode: 'timestamp' }),
+  lastCompletedAt: integer('last_completed_at', { mode: 'timestamp' }),
+  lastResult: text('last_result', { mode: 'json' }).$type<Record<string, unknown>>(),
+  lastError: text('last_error'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const postPublications = sqliteTable(
+  'post_publications',
+  {
+    id: text('id').primaryKey(),
+    scheduledPostId: text('scheduled_post_id')
+      .notNull()
+      .references(() => scheduledPosts.id),
+    contentId: text('content_id')
+      .notNull()
+      .references(() => contents.id),
+    socialAccountId: text('social_account_id')
+      .notNull()
+      .references(() => socialAccounts.id),
+    platform: text('platform').notNull(),
+    externalPostId: text('external_post_id').notNull(),
+    productId: text('product_id').references(() => products.id),
+    affiliateOfferId: text('affiliate_offer_id').references(() => affiliateOffers.id),
+    publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('post_publications_scheduled_post_id_idx').on(table.scheduledPostId),
+    index('post_publications_content_id_idx').on(table.contentId),
+    index('post_publications_product_id_idx').on(table.productId),
+  ],
+);
+
+export const postMetricSnapshots = sqliteTable(
+  'post_metric_snapshots',
+  {
+    id: text('id').primaryKey(),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => postPublications.id),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp' }).notNull(),
+    impressions: integer('impressions'),
+    reach: integer('reach'),
+    clicks: integer('clicks'),
+    reactions: integer('reactions'),
+    comments: integer('comments'),
+    shares: integer('shares'),
+    engagements: integer('engagements'),
+    rawMetrics: text('raw_metrics', { mode: 'json' }).$type<Record<string, unknown>>(),
+    fetchError: text('fetch_error'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('post_metric_snapshots_publication_fetched_idx').on(
+      table.publicationId,
+      table.fetchedAt,
+    ),
+  ],
+);
 
 export const scheduledPosts = sqliteTable(
   'scheduled_posts',
@@ -81,7 +160,6 @@ export const scheduledPosts = sqliteTable(
     retryCount: integer('retry_count').notNull().default(0),
     queuedAt: integer('queued_at', { mode: 'timestamp' }),
     publishingStartedAt: integer('publishing_started_at', { mode: 'timestamp' }),
-    privacyLevel: text('privacy_level').notNull().default('self_only'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
@@ -90,23 +168,88 @@ export const scheduledPosts = sqliteTable(
   ],
 );
 
-export const tokenBlobs = sqliteTable('token_blobs', {
-  id: text('id').primaryKey(),
-  ciphertext: text('ciphertext').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-});
-
-export const oauthStates = sqliteTable(
-  'oauth_states',
+export const products = sqliteTable(
+  'products',
   {
-    state: text('state').primaryKey(),
+    id: text('id').primaryKey(),
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    provider: text('provider').notNull(),
+    externalProductId: text('external_product_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    price: text('price'),
+    originalPrice: text('original_price'),
+    rating: text('rating'),
+    salesCount: integer('sales_count'),
+    images: text('images', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    productUrl: text('product_url').notNull(),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
-  (table) => [index('oauth_states_expires_at_idx').on(table.expiresAt)],
+  (table) => [
+    uniqueIndex('products_user_provider_external_idx').on(
+      table.userId,
+      table.provider,
+      table.externalProductId,
+    ),
+    index('products_user_provider_idx').on(table.userId, table.provider),
+  ],
+);
+
+export const affiliateOffers = sqliteTable(
+  'affiliate_offers',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    provider: text('provider').notNull(),
+    affiliateUrl: text('affiliate_url').notNull(),
+    trackingCode: text('tracking_code'),
+    commissionRate: text('commission_rate'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    uniqueIndex('affiliate_offers_product_url_idx').on(table.productId, table.affiliateUrl),
+    index('affiliate_offers_user_idx').on(table.userId),
+    index('affiliate_offers_product_idx').on(table.productId),
+  ],
+);
+
+export const optimizationRecommendations = sqliteTable(
+  'optimization_recommendations',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    type: text('type').notNull(),
+    status: text('status').notNull().default('pending'),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    rationale: text('rationale').notNull(),
+    priority: text('priority').notNull(),
+    productId: text('product_id').references(() => products.id),
+    contentId: text('content_id').references(() => contents.id),
+    affiliateOfferId: text('affiliate_offer_id').references(() => affiliateOffers.id),
+    evidence: text('evidence', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    aiReasoning: text('ai_reasoning'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    index('optimization_recommendations_user_status_idx').on(table.userId, table.status),
+  ],
 );
 
 export type UserRow = typeof users.$inferSelect;
@@ -114,3 +257,5 @@ export type SocialAccountRow = typeof socialAccounts.$inferSelect;
 export type ContentRow = typeof contents.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 export type ScheduledPostRow = typeof scheduledPosts.$inferSelect;
+export type ProductRow = typeof products.$inferSelect;
+export type AffiliateOfferRow = typeof affiliateOffers.$inferSelect;

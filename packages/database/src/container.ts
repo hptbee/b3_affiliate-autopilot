@@ -1,45 +1,47 @@
 import {
   ContentService,
-  MediaService,
   ScheduledPostService,
   PublishingService,
   SchedulerService,
+  ProductService,
   SocialAccountService,
   createLogger,
   type Logger,
   type PublishQueue,
   type SocialPublisher,
   type SocialPlatform,
+  type AffiliateNetwork,
+  type TokenStore,
 } from '@social-autopilot/core';
 import { createDatabase } from './index.js';
 import { DrizzleContentRepository } from './repositories/content-repository.js';
 import { DrizzleScheduledPostRepository } from './repositories/scheduled-post-repository.js';
 import { DrizzleSocialAccountRepository } from './repositories/social-account-repository.js';
+import { DrizzleProductRepository } from './repositories/product-repository.js';
+import { DrizzleAffiliateOfferRepository } from './repositories/affiliate-offer-repository.js';
 import { DrizzleMediaRepository } from './repositories/media-repository.js';
-import { DrizzleOAuthStateRepository } from './repositories/oauth-state-repository.js';
-import { EncryptedD1TokenStore } from './token-store/encrypted-d1-token-store.js';
 import { R2MediaStorage } from './storage/r2-media-storage.js';
-import type { TikTokOAuthClient } from '@social-autopilot/core';
 
 export interface ServiceContainer {
   contentService: ContentService;
+  contentRepository: DrizzleContentRepository;
   scheduledPostService: ScheduledPostService;
   publishingService: PublishingService;
   schedulerService: SchedulerService;
+  productService: ProductService;
   socialAccountService: SocialAccountService;
-  mediaService: MediaService;
   socialAccountRepository: DrizzleSocialAccountRepository;
+  mediaRepository: DrizzleMediaRepository;
   logger: Logger;
 }
 
 export interface CreateServicesOptions {
   db: D1Database;
-  mediaBucket: R2Bucket;
-  bucketName: string;
   publishQueue: PublishQueue;
   publishers: Map<SocialPlatform, SocialPublisher>;
-  tokenWrapKey: string;
-  tiktokOAuth?: TikTokOAuthClient;
+  affiliateNetwork: AffiliateNetwork;
+  tokenStore: TokenStore;
+  mediaBucket: R2Bucket;
   logger?: Logger;
 }
 
@@ -50,37 +52,19 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
   const contentRepository = new DrizzleContentRepository(database);
   const scheduledPostRepository = new DrizzleScheduledPostRepository(database);
   const socialAccountRepository = new DrizzleSocialAccountRepository(database);
+  const productRepository = new DrizzleProductRepository(database);
+  const affiliateOfferRepository = new DrizzleAffiliateOfferRepository(database);
   const mediaRepository = new DrizzleMediaRepository(database);
-  const oauthStateRepository = new DrizzleOAuthStateRepository(database);
-  const tokenStore = new EncryptedD1TokenStore(database, options.tokenWrapKey);
   const mediaStorage = new R2MediaStorage(options.mediaBucket);
 
   const contentService = new ContentService(contentRepository);
-  const mediaService = new MediaService(
-    mediaRepository,
-    contentRepository,
-    mediaStorage,
-    options.bucketName,
-  );
-
-  const tiktokOAuth = options.tiktokOAuth;
-  if (!tiktokOAuth) {
-    throw new Error('TikTok OAuth client is required');
-  }
-
-  const socialAccountService = new SocialAccountService(
-    socialAccountRepository,
-    tokenStore,
-    oauthStateRepository,
-    tiktokOAuth,
-  );
-
   const scheduledPostService = new ScheduledPostService(
     scheduledPostRepository,
     contentRepository,
     socialAccountRepository,
-    mediaRepository,
   );
+
+  const socialAccountService = new SocialAccountService(socialAccountRepository, options.tokenStore);
 
   const publishingService = new PublishingService(
     scheduledPostRepository,
@@ -88,6 +72,9 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
     socialAccountRepository,
     options.publishers,
     logger,
+    options.tokenStore,
+    mediaRepository,
+    mediaStorage,
   );
 
   const schedulerService = new SchedulerService(
@@ -96,14 +83,22 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
     logger,
   );
 
+  const productService = new ProductService(
+    productRepository,
+    affiliateOfferRepository,
+    options.affiliateNetwork,
+  );
+
   return {
     contentService,
+    contentRepository,
     scheduledPostService,
     publishingService,
     schedulerService,
+    productService,
     socialAccountService,
-    mediaService,
     socialAccountRepository,
+    mediaRepository,
     logger,
   };
 }

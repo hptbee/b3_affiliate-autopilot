@@ -1,19 +1,31 @@
 import type { SocialPlatform, SocialPublisher } from '@social-autopilot/core';
-import { MockTikTokPublisher } from './mock.js';
-import { TikTokPublisher, type TikTokPublisherDeps } from '../tiktok/TikTokPublisher.js';
+import { FacebookPublisher } from '../facebook/publisher.js';
+import { MockFacebookPublisher, MockTikTokPublisher } from './mock.js';
 
 export interface CreateSocialPublishersOptions {
-  tiktokConfigured: boolean;
-  tiktokDeps?: TikTokPublisherDeps;
+  useMockFacebook?: boolean;
+  facebookApiVersion?: string;
+  fetch?: typeof fetch;
 }
 
 export function createSocialPublishers(
-  options: CreateSocialPublishersOptions = { tiktokConfigured: false },
+  options: CreateSocialPublishersOptions = {},
 ): Map<SocialPlatform, SocialPublisher> {
-  if (options.tiktokConfigured && options.tiktokDeps) {
-    return new Map([['tiktok', new TikTokPublisher(options.tiktokDeps)]]);
-  }
-  return new Map([['tiktok', new MockTikTokPublisher()]]);
+  const facebook =
+    options.useMockFacebook === true
+      ? new MockFacebookPublisher()
+      : new FacebookPublisher({
+          apiVersion: options.facebookApiVersion,
+          http: options.fetch ? { fetch: options.fetch } : undefined,
+        });
+
+  return new Map([
+    ['facebook', facebook],
+    ['tiktok', new MockTikTokPublisher()],
+  ]);
 }
 
 export * from './mock.js';
+export * from '../facebook/publisher.js';
+export * from '../facebook/client.js';
+export * from '../facebook/errors.js';

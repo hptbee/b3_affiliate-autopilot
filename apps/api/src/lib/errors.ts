@@ -46,7 +46,7 @@ export function handleError(c: Context<HonoEnv>, error: unknown) {
             : {}),
         },
       },
-      error.statusCode as 400 | 401 | 403 | 404 | 409 | 500 | 502,
+      error.statusCode as 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502 | 503 | 504,
     );
   }
 

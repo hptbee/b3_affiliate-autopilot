@@ -1,6 +1,10 @@
-export const TIKTOK_DRAFT_SYSTEM_PROMPT = `You write TikTok short-form video drafts.
-Return structured fields only: hook, script, caption, hashtags, cta, suggestedPublishAt, qualityScore.
-Keep the hook under 3 seconds of spoken time. Do not invent brand claims.`;
+export const AFFILIATE_DRAFT_SYSTEM_PROMPT = `You write affiliate marketing content that is platform-neutral.
+Return structured fields only: hook, script, caption, hashtags, cta, videoScenePlan, suggestedPublishAt, qualityScore, language, tone.
+The hook must work as a short opening for video or a post. Do not invent brand claims, prices, or discounts that are not in the product data.
+Use the affiliate URL only in the CTA when one is provided. Never confuse the product URL with the affiliate URL.
+Do not mention Facebook, TikTok, or Shopee unless they appear in the product data.`;
 
-export const CONTENT_GENERATION_PROMPT = TIKTOK_DRAFT_SYSTEM_PROMPT;
-export const CONTENT_DRAFT_SYSTEM_PROMPT = TIKTOK_DRAFT_SYSTEM_PROMPT;
+/** @deprecated Use AFFILIATE_DRAFT_SYSTEM_PROMPT. */
+export const TIKTOK_DRAFT_SYSTEM_PROMPT = AFFILIATE_DRAFT_SYSTEM_PROMPT;
+export const CONTENT_GENERATION_PROMPT = AFFILIATE_DRAFT_SYSTEM_PROMPT;
+export const CONTENT_DRAFT_SYSTEM_PROMPT = AFFILIATE_DRAFT_SYSTEM_PROMPT;

@@ -1,39 +1,19 @@
-# TikTok integration (Phase 1)
+# TikTok publisher (PENDING / FUTURE — not implemented)
 
-## OAuth scopes (Content Posting API)
+TikTok is **not** the product center. It is a future distribution adapter behind `SocialPublisher`.
 
-Confirm against current TikTok docs before production:
+Do not add real OAuth or TikTok HTTP here yet. Facebook is the first live distribution target (Phase 4).
 
-- `user.info.basic`
-- `video.upload`
-- `video.publish`
-
-## Modules
+Planned modules:
 
 ```text
 packages/social/src/tiktok/
-  TikTokOAuth.ts      OAuth start/callback/refresh
-  TikTokClient.ts     init upload, upload bytes, publish status
-  TikTokPublisher.ts  SocialPublisher implementation
-  TikTokErrors.ts     failed / uncertain / dead mapping
+  TikTokClient.ts
+  TikTokOAuth.ts
+  TikTokPublisher.ts
+  TikTokErrors.ts
 ```
 
-When Worker secrets are missing, `MockTikTokPublisher` remains the default publisher.
+Until that phase, `MockTikTokPublisher` is the only TikTok publisher. It must never be mistaken for a production TikTok client.
 
-## Token storage
-
-```text
-SocialAccount.accessTokenRef / refreshTokenRef
-  → EncryptedD1TokenStore (TOKEN_WRAP_KEY)
-  → token_blobs table
-```
-
-Tokens never leave the Worker. API responses omit refs.
-
-## Video flow
-
-```text
-Browser upload → Worker → R2
-D1 media row (contentId, key, mimeType, size)
-Publish resolves video by scheduledPost.contentId
-```
+Video/media files are uploaded to R2; this package only receives metadata + a Worker-resolved access token at publish time. Affiliate URLs stay separate from media assets.

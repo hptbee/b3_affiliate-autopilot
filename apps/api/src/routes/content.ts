@@ -20,7 +20,22 @@ const updateContentSchema = z
   })
   .strict();
 
-export { createContentSchema, updateContentSchema };
+const generateContentSchema = z
+  .object({
+    productId: z.string().min(1),
+    affiliateOfferId: z.string().min(1).optional(),
+    tone: z.string().min(1).max(64).optional(),
+    language: z.string().min(1).max(16).optional(),
+  })
+  .strict();
+
+const generateMediaSchema = z
+  .object({
+    productId: z.string().min(1).optional(),
+  })
+  .strict();
+
+export { createContentSchema, updateContentSchema, generateContentSchema, generateMediaSchema };
 
 export const contentRoutes = new Hono<HonoEnv>();
 
@@ -40,6 +55,52 @@ contentRoutes.post('/', async (c) => {
     const { contentService } = getServices(c);
     const content = await contentService.create(getUser(c), body);
     return c.json({ data: content }, 201);
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.post('/generate', async (c) => {
+  try {
+    const body = generateContentSchema.parse(await c.req.json());
+    const { affiliateContentService } = getServices(c);
+    const result = await affiliateContentService.generateDraft(getUser(c), body);
+    return c.json({ data: result }, 201);
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.get('/:id/media', async (c) => {
+  try {
+    const { mediaService } = getServices(c);
+    const items = await mediaService.listForContent(getUser(c), c.req.param('id'));
+    return c.json({ data: items });
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.post('/:id/media/generate', async (c) => {
+  try {
+    const body = generateMediaSchema.parse(await c.req.json().catch(() => ({})));
+    const { mediaService } = getServices(c);
+    const asset = await mediaService.generateForContent(getUser(c), c.req.param('id'), body);
+    return c.json({ data: asset }, 201);
+  } catch (error) {
+    return handleError(c, error);
+  }
+});
+
+contentRoutes.get('/:id/media/:mediaId', async (c) => {
+  try {
+    const { mediaService } = getServices(c);
+    const asset = await mediaService.getForContent(
+      getUser(c),
+      c.req.param('id'),
+      c.req.param('mediaId'),
+    );
+    return c.json({ data: asset });
   } catch (error) {
     return handleError(c, error);
   }

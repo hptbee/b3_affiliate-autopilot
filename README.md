@@ -1,85 +1,110 @@
-# TikTok Autopilot
+# AI Affiliate Content Autopilot
 
-An AI-powered TikTok content automation platform built on Cloudflare.
+An affiliate-first content automation platform built on Cloudflare.
 
-**Status:** v0.1 foundation — TikTok-first domain, mock publisher, no live TikTok API yet.
+**Status:** v0.1 — Phase 1 Shopee Affiliate foundation. Shopee is the first affiliate provider. Facebook is the first distribution target. TikTok is a **PENDING / FUTURE** distribution channel. Live Shopee GraphQL runs only when Worker secrets are configured. No Facebook or TikTok APIs.
 
 ## Product
 
+The core is **Affiliate → Content → Media → Distribution → Analytics**, not TikTok → Content.
+
 ```text
-Topic / Idea
-    ↓
+Affiliate Product
+      ↓
+Product Research / Selection
+      ↓
+Affiliate Link
+      ↓
 AI Content Generation
-    ↓
-Draft
-    ↓
+      ↓
+Video / Media
+      ↓
 Human Approval
-    ↓
+      ↓
 Schedule
-    ↓
-Cron
-    ↓
-Cloudflare Queue
-    ↓
-TikTok Publisher
-    ↓
-TikTok
-    ↓
-Published / Failed / Uncertain
+      ↓
+Distribution
+      ↓
+Analytics / Conversion
 ```
 
-TikTok is the only MVP destination. Other platforms may be added later; they are not in scope now.
+Near-term path (current roadmap):
+
+```text
+Shopee
+  ↓
+Affiliate Product
+  ↓
+AI Content
+  ↓
+Media
+  ↓
+Approval
+  ↓
+Scheduling
+  ↓
+Distribution
+  ↓
+Facebook
+```
+
+TikTok remains an additional future distribution adapter on the same `SocialPublisher` port. It is not removed, and it is not the center of the domain.
 
 ## MVP
 
-1. Create content
-2. Generate TikTok content with AI
-3. Human approval
-4. Upload video (R2)
-5. Connect TikTok account
-6. Schedule TikTok post
-7. Cron discovers due posts
-8. Queue publishing job
-9. Publisher publishes to TikTok
-10. Persist publishing result
-11. Handle failed / uncertain publishing without duplicate posts
+1. Product can be imported/discovered
+2. Product can have an AffiliateOffer
+3. AI can generate affiliate-oriented content
+4. User can review/approve content
+5. Media can eventually be attached
+6. Content can be scheduled
+7. Queue can process distribution jobs
+8. Facebook is the first publishing target
+9. Publishing is idempotent
+10. Failed / uncertain publishing is handled safely
 
-This repo implements the Phase 1 TikTok MVP path. Without TikTok secrets it still publishes through `MockTikTokPublisher`. Next step is **Phase 2: TikTok AI drafts**.
+This repo is **not** at MVP yet. Phase 1 is in: import a Shopee offer into `Product` + `AffiliateOffer`. Next: obtain Vietnam Open API access and confirm the live GraphQL schema, then Phase 2 AI content.
 
 ## Cloudflare architecture
 
 ```text
-React Dashboard
-      ↓
-Cloudflare Worker + Hono (`apps/api`: `fetch` + `scheduled` + `queue`)
-      ↓
-D1 ──────────────── R2
- │                   │
- │                   └── Video assets
- │
- └── Content / Posts / Accounts / encrypted token refs
-
-Cron
-  ↓
-Queue
-  ↓
-Publisher
-  ↓
-TikTok API
-
-AI
-  ↓
-Workers AI / OpenAI
+                    Dashboard
+                        │
+                        ▼
+                Cloudflare Worker
+                     Hono
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+       D1               R2               AI
+        │               │                │
+        │               │          Workers AI /
+        │               │             OpenAI
+        │               │
+        ▼               ▼
+    Products        Media Assets
+    Affiliate
+    Content
+    Campaigns
+    Posts
+        │
+        ▼
+      Queue
+        │
+   ┌────┴─────┐
+   ▼          ▼
+Facebook    TikTok
+(first)     (FUTURE)
 ```
 
 | Service | Role |
 |---------|------|
-| Workers | HTTP API, Cron, and Queue consumer (`apps/api`) |
-| D1 | Users, content, scheduled posts, account metadata, token *refs* |
-| R2 | Video binaries (metadata stays in D1) |
-| Queues | `{ scheduledPostId }` publish jobs |
+| Workers | HTTP API, Cron, and Queue consumer (`apps/api`: `fetch` + `scheduled` + `queue`) |
+| D1 | Users, products, affiliate offers, content, scheduled posts, account metadata, token *refs* |
+| R2 | Media assets (images, audio, video, thumbnails). Metadata stays in D1 |
+| Queues | `{ scheduledPostId }` distribution jobs |
 | Cron | Find due posts, claim `queuedAt`, enqueue |
-| Worker Secrets | `OPENAI_API_KEY`, `TOKEN_WRAP_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REDIRECT_URI` |
+| Worker Secrets | `OPENAI_API_KEY`; Shopee `SHOPEE_AFFILIATE_APP_ID` + `SHOPEE_AFFILIATE_SECRET`; later Facebook secrets + `TOKEN_WRAP_KEY` |
 | Workers AI | Default generate in development |
 | OpenAI | Optional structured-generation provider |
 
@@ -89,27 +114,19 @@ Do **not** introduce Redis, PostgreSQL, Temporal, SQS, Durable Objects, Kubernet
 
 ## Domain
 
-**Content** (creative artifact): `draft → approved → archived | cancelled`  
-Publishing status does **not** live here.
+**Product** — an affiliate-provider listing (Shopee first). Product URL ≠ affiliate URL.
 
-**ScheduledPost** (TikTok job): `scheduled → publishing → published`  
-Failures: `publishing → failed` (retryable) or `uncertain` (do not retry) or `dead`.
+**AffiliateOffer** — the monetization link/tracking relationship for a product.
+
+**Content** — platform-independent creative artifact: `draft → approved → archived | cancelled`. Publishing status does **not** live here. Facebook/TikTok/Shopee fields do not belong on the core Content entity.
+
+**MediaAsset** — image / audio / video / thumbnail / rendered video. Binary in R2, metadata in D1. Pipeline not implemented yet.
+
+**ScheduledPost** — a distribution job: `scheduled → publishing → published`. Failures: `publishing → failed` (retryable) or `uncertain` (do not retry) or `dead`.
+
+**Distribution** — publishing destinations. Facebook is first. TikTok is PENDING / FUTURE. Instagram and YouTube are later.
 
 Scheduling requires `Content.status === approved`.
-
-## Local E2E (Phase 1)
-
-```bash
-pnpm install
-pnpm db:migrate
-pnpm --filter @social-autopilot/api exec wrangler d1 execute social-autopilot-db --local --file=../../scripts/seed.sql
-pnpm cf:dev
-pnpm --filter @social-autopilot/web dev
-```
-
-Path: create draft → upload video → approve → schedule (mock or connected TikTok account) → cron/queue → `externalPostId`.
-
-Without TikTok secrets, publishing uses `MockTikTokPublisher`. Set secrets in `apps/api/.dev.vars` for live OAuth/publish.
 
 ## Local setup
 
@@ -144,6 +161,8 @@ wrangler queues create social-autopilot-publish-dlq
 cd apps/api
 wrangler d1 migrations apply social-autopilot-db --remote
 wrangler secret put OPENAI_API_KEY --env production
+wrangler secret put SHOPEE_AFFILIATE_APP_ID --env production
+wrangler secret put SHOPEE_AFFILIATE_SECRET --env production
 ```
 
 Fill real `database_id` values in `wrangler.jsonc`. Resources are not created automatically.
@@ -163,14 +182,16 @@ Fill real `database_id` values in `wrangler.jsonc`. Resources are not created au
 | GET | `/api/scheduled-posts` | List current user's jobs |
 | POST | `/api/scheduled-posts` | Schedule approved content |
 | POST | `/api/scheduled-posts/:id/cancel` | Cancel job |
-| GET | `/api/oauth/tiktok/start` | Start TikTok OAuth (redirect) |
-| GET | `/api/oauth/tiktok/callback` | OAuth callback (redirect to web) |
-| POST | `/api/content/:id/media` | Upload video (multipart) |
-| GET | `/api/content/:id/media` | Get video metadata |
-| GET | `/api/social-accounts` | List TikTok accounts (no tokens) |
-| POST | `/api/social-accounts/:id/disconnect` | Disconnect TikTok account |
+| GET | `/api/social-accounts` | List distribution accounts (no tokens) |
+| POST | `/api/products/search` | Discover Shopee offers (no persist) |
+| POST | `/api/products/import` | Persist Product + AffiliateOffer |
+| GET | `/api/products` | List imported products |
+| GET | `/api/products/:id` | Product + offers (owner only) |
+| POST | `/api/products/:id/affiliate-offer` | Generate a tracked affiliate link |
 
 `userId` is never taken from the request body. `UserContext` is set in middleware (bootstrap user today).
+
+Shopee HTTP is not called unless Worker secrets are set. Media-upload HTTP is not in this phase.
 
 ## Commands
 
@@ -184,24 +205,27 @@ pnpm cf:dev
 
 ## Testing
 
-Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, owner scoping, publish idempotency, uncertain/dead outcomes, and mock TikTok publisher. No live TikTok or AI calls.
+Unit tests cover Content/ScheduledPost transitions, approval-before-schedule, owner scoping, publish idempotency, uncertain/dead outcomes, and mock distribution publishers. No live Shopee, Facebook, TikTok, or AI calls.
 
 ## Roadmap
 
 See [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md).
 
-- **Phase 0** — Architecture hardening (complete)
-- **Phase 1** — TikTok MVP (complete; live TikTok requires secrets)
-- **Phase 2** — TikTok AI drafts
-- **Phase 3** — AI video pipeline
-- **Phase 4** — Research
-- **Phase 5** — Autonomous agent
-- **Phase 6** — MCP
-- **Phase 7** — Analytics
+- **Phase 0** — Architecture & domain refactor (complete)
+- **Phase 1** — Shopee Affiliate foundation (this change; live API still needs App ID approval)
+- **Phase 2** — AI affiliate content
+- **Phase 3** — Media / video pipeline
+- **Phase 4** — Facebook distribution (verify Meta API first)
+- **Phase 5** — Scheduling & automation (reuse existing Cron/Queue/lock design)
+- **Phase 6** — Analytics / conversion
+- **Phase 7** — Autonomous affiliate agent
+- **Phase 8** — MCP / advanced automation
+
+TikTok live integration is **PENDING / FUTURE**, after Facebook distribution.
 
 ## Out of MVP
 
-LinkedIn, X, Meta, Instagram, IdP, teams, billing, autonomous publish, MCP, analytics, AI video generation, Redis, Postgres, Temporal, Durable Objects, extra services.
+TikTok live integration, Instagram, LinkedIn, X, YouTube, autonomous publishing, autonomous agents, MCP, advanced analytics, AI video generation, billing, teams, multi-tenant enterprise features, Redis, Postgres, Temporal, Durable Objects, extra services.
 
 ## License
 

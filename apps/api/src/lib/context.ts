@@ -1,66 +1,60 @@
-import { createAIProvider } from '@social-autopilot/ai';
+import { createAIProvider, createAffiliateContentGenerator, createAffiliateCoverMediaGenerator, createOptimizationReasoningProvider } from '@social-autopilot/ai';
 import {
+  AffiliateContentPipelineService,
+  AffiliateContentService,
+  AffiliateOptimizationService,
+  AffiliatePipelineSchedulerService,
+  AffiliateProductSelectionService,
+  MediaService,
+  parseAffiliatePipelineScheduleConfig,
+  parsePostAnalyticsScheduleConfig,
+  PostAnalyticsRefreshSchedulerService,
+  PostAnalyticsService,
+} from '@social-autopilot/core';
+import {
+  createDatabase,
   createServices,
   CloudflarePublishQueue,
-  type ServiceContainer,
+  DrizzleMediaRepository,
+  DrizzlePipelineLockRepository,
+  DrizzleOptimizationRecommendationRepository,
+  DrizzlePostMetricSnapshotRepository,
+  DrizzlePostPublicationRepository,
+  DrizzlePublishedPostSourceRepository,
+  EncryptedTokenStore,
+  R2MediaStorage,
 } from '@social-autopilot/database';
-import { createSocialPublishers, TikTokOAuth } from '@social-autopilot/social';
+import { createPostAnalyticsProviders, createSocialPublishers } from '@social-autopilot/social';
+import { createShopeeAffiliateNetwork } from '@social-autopilot/affiliate';
 import type { Env } from '../../worker-configuration';
 
-const DEV_TOKEN_WRAP_KEY = 'dev-only-wrap-key-32-bytes!!';
+const DEV_TOKEN_WRAP_KEY = 'local-dev-token-wrap-key-change-me';
 
-export function hasTikTokConfig(env: Env): boolean {
-  return !!(
-    env.TIKTOK_CLIENT_KEY &&
-    env.TIKTOK_CLIENT_SECRET &&
-    env.TIKTOK_REDIRECT_URI &&
-    env.TOKEN_WRAP_KEY
-  );
-}
-
-export function createAppContext(
-  env: Env,
-): ServiceContainer & { aiProvider: ReturnType<typeof createAIProvider> } {
+export function createAppContext(env: Env) {
   const publishQueue = new CloudflarePublishQueue(env.PUBLISH_QUEUE);
-  const tiktokConfigured = hasTikTokConfig(env);
-  const tiktokOAuth = new TikTokOAuth({
-    clientKey: env.TIKTOK_CLIENT_KEY ?? 'disabled',
-    clientSecret: env.TIKTOK_CLIENT_SECRET ?? 'disabled',
-    redirectUri: env.TIKTOK_REDIRECT_URI ?? 'http://localhost:8787/api/oauth/tiktok/callback',
-  });
-
-  const baseServices = createServices({
-    db: env.DB,
-    mediaBucket: env.MEDIA_BUCKET,
-    bucketName: 'social-autopilot-media',
-    publishQueue,
-    tokenWrapKey: env.TOKEN_WRAP_KEY ?? DEV_TOKEN_WRAP_KEY,
-    tiktokOAuth,
-    publishers: createSocialPublishers({ tiktokConfigured: false }),
-  });
-
   const publishers = createSocialPublishers({
-    tiktokConfigured,
-    tiktokDeps: tiktokConfigured
-      ? {
-          getAccessToken: async (socialAccountId) => {
-            const account = await baseServices.socialAccountRepository.findById(socialAccountId);
-            if (!account) throw new Error('Social account not found');
-            return baseServices.socialAccountService.refreshIfNeeded(account);
-          },
-          getVideoBytes: async (contentId) => baseServices.mediaService.getBytesForContent(contentId),
-        }
-      : undefined,
+    facebookApiVersion: env.FACEBOOK_GRAPH_API_VERSION,
+    useMockFacebook: env.USE_MOCK_FACEBOOK_PUBLISHER === 'true',
   });
+  const affiliateNetwork = createShopeeAffiliateNetwork({
+    appId: env.SHOPEE_AFFILIATE_APP_ID,
+    secret: env.SHOPEE_AFFILIATE_SECRET,
+    endpoint: env.SHOPEE_AFFILIATE_ENDPOINT,
+  });
+
+  const database = createDatabase(env.DB);
+  const tokenStore = new EncryptedTokenStore(
+    database,
+    env.TOKEN_WRAP_KEY ?? DEV_TOKEN_WRAP_KEY,
+  );
 
   const services = createServices({
     db: env.DB,
-    mediaBucket: env.MEDIA_BUCKET,
-    bucketName: 'social-autopilot-media',
     publishQueue,
-    tokenWrapKey: env.TOKEN_WRAP_KEY ?? DEV_TOKEN_WRAP_KEY,
-    tiktokOAuth,
     publishers,
+    affiliateNetwork,
+    tokenStore,
+    mediaBucket: env.MEDIA_BUCKET,
   });
 
   const aiProvider = createAIProvider({
@@ -69,7 +63,92 @@ export function createAppContext(
     workersAiBinding: env.AI,
   });
 
-  return { ...services, aiProvider };
+  const affiliateContentGenerator = createAffiliateContentGenerator(aiProvider);
+  const affiliateContentService = new AffiliateContentService(
+    services.productService,
+    services.contentService,
+    affiliateContentGenerator,
+  );
+
+  const affiliateProductSelectionService = new AffiliateProductSelectionService(
+    services.productService,
+    services.contentRepository,
+  );
+
+  const mediaRepository = new DrizzleMediaRepository(database);
+  const mediaStorage = new R2MediaStorage(env.MEDIA_BUCKET);
+  const coverMediaGenerator = createAffiliateCoverMediaGenerator(aiProvider);
+  const mediaService = new MediaService(
+    services.contentService,
+    services.productService,
+    mediaRepository,
+    mediaStorage,
+    coverMediaGenerator,
+    'social-autopilot-media',
+  );
+
+  const affiliateContentPipelineService = new AffiliateContentPipelineService(
+    affiliateProductSelectionService,
+    affiliateContentService,
+    mediaService,
+  );
+
+  const pipelineLockRepository = new DrizzlePipelineLockRepository(database);
+  const affiliatePipelineSchedulerService = new AffiliatePipelineSchedulerService(
+    affiliateContentPipelineService,
+    pipelineLockRepository,
+    services.logger,
+    parseAffiliatePipelineScheduleConfig(env),
+  );
+
+  const postPublicationRepository = new DrizzlePostPublicationRepository(database);
+  const postMetricSnapshotRepository = new DrizzlePostMetricSnapshotRepository(database);
+  const publishedPostSourceRepository = new DrizzlePublishedPostSourceRepository(database);
+  const analyticsProviders = createPostAnalyticsProviders({
+    facebookApiVersion: env.FACEBOOK_GRAPH_API_VERSION,
+    useMockFacebook: env.USE_MOCK_FACEBOOK_PUBLISHER === 'true',
+  });
+  const postAnalyticsService = new PostAnalyticsService(
+    postPublicationRepository,
+    postMetricSnapshotRepository,
+    publishedPostSourceRepository,
+    services.socialAccountRepository,
+    services.contentRepository,
+    analyticsProviders,
+    tokenStore,
+    services.logger,
+  );
+  const postAnalyticsRefreshSchedulerService = new PostAnalyticsRefreshSchedulerService(
+    postAnalyticsService,
+    pipelineLockRepository,
+    services.logger,
+    parsePostAnalyticsScheduleConfig(env),
+  );
+
+  const optimizationRecommendationRepository = new DrizzleOptimizationRecommendationRepository(
+    database,
+  );
+  const affiliateOptimizationService = new AffiliateOptimizationService(
+    optimizationRecommendationRepository,
+    postPublicationRepository,
+    services.contentRepository,
+    services.productService,
+    createOptimizationReasoningProvider(aiProvider),
+    services.logger,
+  );
+
+  return {
+    ...services,
+    aiProvider,
+    affiliateContentService,
+    affiliateContentPipelineService,
+    affiliatePipelineSchedulerService,
+    affiliateOptimizationService,
+    postAnalyticsService,
+    postAnalyticsRefreshSchedulerService,
+    mediaService,
+    tokenStore,
+  };
 }
 
 export type AppContext = ReturnType<typeof createAppContext>;

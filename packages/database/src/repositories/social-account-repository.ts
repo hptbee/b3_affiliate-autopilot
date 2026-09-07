@@ -1,11 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type {
   SocialAccount,
   SocialAccountRepository,
+  SocialPlatform,
+  SocialAccountStatus,
   UpsertSocialAccountInput,
 } from '@social-autopilot/core';
-import type { SocialPlatform, SocialAccountStatus } from '@social-autopilot/core';
 import { socialAccounts } from '../schema/index.js';
 import type * as schema from '../schema/index.js';
 
@@ -50,36 +51,48 @@ export class DrizzleSocialAccountRepository implements SocialAccountRepository {
     return rows.map(mapSocialAccount);
   }
 
-  async findByUserAndPlatform(userId: string, platform: SocialPlatform): Promise<SocialAccount | null> {
+  async findByUserPlatformExternal(
+    userId: string,
+    platform: SocialPlatform,
+    externalAccountId: string,
+  ): Promise<SocialAccount | null> {
     const rows = await this.db
       .select()
       .from(socialAccounts)
-      .where(eq(socialAccounts.userId, userId))
-      .limit(50);
-    const match = rows.find((row) => row.platform === platform);
-    return match ? mapSocialAccount(match) : null;
+      .where(
+        and(
+          eq(socialAccounts.userId, userId),
+          eq(socialAccounts.platform, platform),
+          eq(socialAccounts.externalAccountId, externalAccountId),
+        ),
+      )
+      .limit(1);
+    return rows[0] ? mapSocialAccount(rows[0]) : null;
   }
 
-  async upsertByUserAndPlatform(input: UpsertSocialAccountInput): Promise<SocialAccount> {
-    const existing = await this.findByUserAndPlatform(input.userId, input.platform);
+  async upsert(input: UpsertSocialAccountInput): Promise<SocialAccount> {
+    const existing = await this.findByUserPlatformExternal(
+      input.userId,
+      input.platform,
+      input.externalAccountId,
+    );
     const now = new Date();
 
     if (existing) {
       await this.db
         .update(socialAccounts)
         .set({
-          externalAccountId: input.externalAccountId,
           displayName: input.displayName,
           accessTokenRef: input.accessTokenRef,
           refreshTokenRef: input.refreshTokenRef,
           tokenExpiresAt: input.tokenExpiresAt,
-          metadata: input.metadata ?? existing.metadata,
-          status: input.status ?? 'active',
+          metadata: input.metadata,
+          status: input.status,
           updatedAt: now,
         })
         .where(eq(socialAccounts.id, existing.id));
       const updated = await this.findById(existing.id);
-      if (!updated) throw new Error('Social account not found after update');
+      if (!updated) throw new Error(`SocialAccount not found after update: ${existing.id}`);
       return updated;
     }
 
@@ -92,8 +105,8 @@ export class DrizzleSocialAccountRepository implements SocialAccountRepository {
       accessTokenRef: input.accessTokenRef,
       refreshTokenRef: input.refreshTokenRef,
       tokenExpiresAt: input.tokenExpiresAt,
-      metadata: input.metadata ?? {},
-      status: input.status ?? 'active',
+      metadata: input.metadata,
+      status: input.status,
       createdAt: now,
       updatedAt: now,
     };
@@ -101,39 +114,7 @@ export class DrizzleSocialAccountRepository implements SocialAccountRepository {
     return mapSocialAccount(row);
   }
 
-  async updateTokens(
-    id: string,
-    input: {
-      accessTokenRef: string;
-      refreshTokenRef: string | null;
-      tokenExpiresAt: Date | null;
-      status?: SocialAccountStatus;
-    },
-  ): Promise<SocialAccount> {
-    const now = new Date();
-    await this.db
-      .update(socialAccounts)
-      .set({
-        accessTokenRef: input.accessTokenRef,
-        refreshTokenRef: input.refreshTokenRef,
-        tokenExpiresAt: input.tokenExpiresAt,
-        status: input.status ?? 'active',
-        updatedAt: now,
-      })
-      .where(eq(socialAccounts.id, id));
-    const updated = await this.findById(id);
-    if (!updated) throw new Error('Social account not found after token update');
-    return updated;
-  }
-
-  async disconnect(id: string): Promise<SocialAccount> {
-    const now = new Date();
-    await this.db
-      .update(socialAccounts)
-      .set({ status: 'disconnected', updatedAt: now })
-      .where(eq(socialAccounts.id, id));
-    const updated = await this.findById(id);
-    if (!updated) throw new Error('Social account not found after disconnect');
-    return updated;
+  async delete(id: string): Promise<void> {
+    await this.db.delete(socialAccounts).where(eq(socialAccounts.id, id));
   }
 }

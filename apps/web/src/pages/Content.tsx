@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, Badge, Button, Input, Textarea } from '../components/ui';
-import { api, type Content, type Media } from '../lib/api';
+import { api, type Content } from '../lib/api';
 
 function statusVariant(status: string) {
   if (status === 'approved') return 'success' as const;
@@ -11,30 +11,20 @@ function statusVariant(status: string) {
 
 export function ContentPage() {
   const [items, setItems] = useState<Content[]>([]);
-  const [mediaByContent, setMediaByContent] = useState<Record<string, Media | null>>({});
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
-    const content = await api.listContent();
-    setItems(content);
-    const mediaEntries = await Promise.all(
-      content.map(async (item) => {
-        try {
-          const media = await api.getMedia(item.id);
-          return [item.id, media] as const;
-        } catch {
-          return [item.id, null] as const;
-        }
-      }),
-    );
-    setMediaByContent(Object.fromEntries(mediaEntries));
+  const load = () => {
+    api
+      .listContent()
+      .then(setItems)
+      .catch((e) => setError(e.message));
   };
 
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    load();
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -45,7 +35,7 @@ export function ContentPage() {
       await api.createContent({ title, body });
       setTitle('');
       setBody('');
-      await load();
+      load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create');
     } finally {
@@ -53,24 +43,11 @@ export function ContentPage() {
     }
   };
 
-  const handleUpload = async (contentId: string, file: File | undefined) => {
-    if (!file) return;
-    setError(null);
-    try {
-      await api.uploadMedia(contentId, file);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
-    }
-  };
-
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">TikTok Content</h2>
-        <p className="text-muted-foreground">
-          Upload a video, approve the draft, then schedule it from the Scheduled page
-        </p>
+        <h2 className="text-2xl font-bold">Affiliate Content</h2>
+        <p className="text-muted-foreground">Drafts must be approved before they can be scheduled</p>
       </div>
 
       <Card>
@@ -105,25 +82,12 @@ export function ContentPage() {
           items.map((item) => (
             <Card key={item.id}>
               <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
+                <div>
                   <h4 className="font-medium">{item.title}</h4>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{item.body}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.body}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
                     {new Date(item.createdAt).toLocaleString()}
                   </p>
-                  {mediaByContent[item.id] ? (
-                    <p className="text-xs text-muted-foreground">
-                      Video: {mediaByContent[item.id]?.mimeType} (
-                      {Math.round((mediaByContent[item.id]?.size ?? 0) / 1024)} KB)
-                    </p>
-                  ) : (
-                    <p className="text-xs text-warning">No video uploaded</p>
-                  )}
-                  <Input
-                    type="file"
-                    accept="video/mp4,video/quicktime,video/webm"
-                    onChange={(e) => handleUpload(item.id, e.target.files?.[0])}
-                  />
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Badge variant={statusVariant(item.status)}>{item.status}</Badge>

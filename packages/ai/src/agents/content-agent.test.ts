@@ -27,6 +27,7 @@ function createMockContentService(): ContentService {
       body: input.body,
       status: 'draft' as const,
       contentType: 'video' as const,
+      metadata: {},
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
@@ -34,12 +35,15 @@ function createMockContentService(): ContentService {
 }
 
 describe('ContentAgent', () => {
-  it('generates and persists a TikTok draft for the current user', async () => {
+  it('generates and persists an affiliate draft for the current user', async () => {
     const ai = createMockAIProvider();
     const contentService = createMockContentService();
     const agent = new ContentAgent(ai, contentService);
 
-    const result = await agent.generateDraft({ userId: 'user-1' }, { topic: 'Cloudflare Workers' });
+    const result = await agent.generateDraft(
+      { userId: 'user-1' },
+      { productTitle: 'Wireless earbuds', affiliateUrl: 'https://affiliate.example/offer' },
+    );
 
     expect(result.success).toBe(true);
     expect(result.data?.contentId).toBe('content-123');
