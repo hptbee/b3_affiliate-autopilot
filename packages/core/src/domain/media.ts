@@ -8,7 +8,6 @@ export type MediaType = MediaAssetType;
 
 /**
  * D1 metadata only. Binary lives in R2.
- * Pipeline (TTS, renderer, thumbnails) is Phase 3 — not implemented here.
  */
 export interface MediaAsset {
   id: string;

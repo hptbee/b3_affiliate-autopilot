@@ -1,6 +1,12 @@
-import { createAIProvider, createAffiliateContentGenerator } from '@social-autopilot/ai';
-import { AffiliateContentService } from '@social-autopilot/core';
-import { createServices, CloudflarePublishQueue } from '@social-autopilot/database';
+import { createAIProvider, createAffiliateContentGenerator, createAffiliateCoverMediaGenerator } from '@social-autopilot/ai';
+import { AffiliateContentService, MediaService } from '@social-autopilot/core';
+import {
+  createDatabase,
+  createServices,
+  CloudflarePublishQueue,
+  DrizzleMediaRepository,
+  R2MediaStorage,
+} from '@social-autopilot/database';
 import { createSocialPublishers } from '@social-autopilot/social';
 import { createShopeeAffiliateNetwork } from '@social-autopilot/affiliate';
 import type { Env } from '../../worker-configuration';
@@ -34,7 +40,20 @@ export function createAppContext(env: Env) {
     affiliateContentGenerator,
   );
 
-  return { ...services, aiProvider, affiliateContentService };
+  const database = createDatabase(env.DB);
+  const mediaRepository = new DrizzleMediaRepository(database);
+  const mediaStorage = new R2MediaStorage(env.MEDIA_BUCKET);
+  const coverMediaGenerator = createAffiliateCoverMediaGenerator(aiProvider);
+  const mediaService = new MediaService(
+    services.contentService,
+    services.productService,
+    mediaRepository,
+    mediaStorage,
+    coverMediaGenerator,
+    'social-autopilot-media',
+  );
+
+  return { ...services, aiProvider, affiliateContentService, mediaService };
 }
 
 export type AppContext = ReturnType<typeof createAppContext>;
