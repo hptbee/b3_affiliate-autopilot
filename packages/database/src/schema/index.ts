@@ -49,6 +49,7 @@ export const contents = sqliteTable(
     body: text('body').notNull(),
     status: text('status').notNull().default('draft'),
     contentType: text('content_type').notNull().default('video'),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },

@@ -43,6 +43,7 @@ function createContent(overrides: Partial<Content> = {}): Content {
     body: 'Body',
     status: 'approved',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -173,6 +174,9 @@ function createServices(
     },
     async findByUserId() {
       return [...contentStore.values()];
+    },
+    async findRecentByAffiliateOffer() {
+      return [];
     },
     async update(id, input) {
       const existing = contentStore.get(id)!;

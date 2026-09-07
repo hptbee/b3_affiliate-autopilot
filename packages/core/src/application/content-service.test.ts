@@ -18,6 +18,7 @@ function createMockContent(overrides: Partial<Content> = {}): Content {
     body: 'Test body content',
     status: 'draft',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -35,6 +36,7 @@ function createMockRepository(content: Content = createMockContent()): ContentRe
         title: input.title,
         body: input.body,
         contentType: input.contentType ?? 'video',
+        metadata: input.metadata ?? {},
       });
       store.set(created.id, created);
       return created;
@@ -44,6 +46,9 @@ function createMockRepository(content: Content = createMockContent()): ContentRe
     },
     async findByUserId(userId) {
       return [...store.values()].filter((c) => c.userId === userId);
+    },
+    async findRecentByAffiliateOffer() {
+      return [];
     },
     async update(id, input) {
       const existing = store.get(id);
@@ -120,5 +125,33 @@ describe('ContentService', () => {
   it('does not allow another user to approve', async () => {
     const service = new ContentService(createMockRepository());
     await expect(service.approve(other, 'content-1')).rejects.toThrow('Content not found');
+  });
+
+  it('rejects approval when affiliate metadata URL is missing from content', async () => {
+    const content = createMockContent({
+      body: 'No affiliate link here',
+      metadata: {
+        productId: 'p1',
+        affiliateOfferId: 'o1',
+        affiliateUrl: 'https://shope.ee/w',
+      },
+    });
+    const service = new ContentService(createMockRepository(content));
+    await expect(service.approve(user, 'content-1')).rejects.toThrow(ConflictError);
+  });
+
+  it('rejects draft edits that remove the affiliate URL', async () => {
+    const content = createMockContent({
+      body: 'Shop https://shope.ee/w',
+      metadata: {
+        productId: 'p1',
+        affiliateOfferId: 'o1',
+        affiliateUrl: 'https://shope.ee/w',
+      },
+    });
+    const service = new ContentService(createMockRepository(content));
+    await expect(service.update(user, 'content-1', { body: 'No link' })).rejects.toThrow(
+      ConflictError,
+    );
   });
 });

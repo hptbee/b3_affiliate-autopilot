@@ -1,7 +1,7 @@
 function generateId(): string {
   return crypto.randomUUID();
 }
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type {
   Content,
@@ -20,6 +20,7 @@ function mapContent(row: typeof contents.$inferSelect): Content {
     body: row.body,
     status: row.status as ContentStatus,
     contentType: row.contentType as ContentType,
+    metadata: row.metadata ?? {},
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -33,6 +34,7 @@ export class DrizzleContentRepository implements ContentRepository {
     title: string;
     body: string;
     contentType?: ContentType;
+    metadata?: Record<string, unknown>;
   }): Promise<Content> {
     const now = new Date();
     const row = {
@@ -42,6 +44,7 @@ export class DrizzleContentRepository implements ContentRepository {
       body: input.body,
       status: 'draft' as const,
       contentType: input.contentType ?? 'video',
+      metadata: input.metadata ?? {},
       createdAt: now,
       updatedAt: now,
     };
@@ -56,6 +59,26 @@ export class DrizzleContentRepository implements ContentRepository {
 
   async findByUserId(userId: string): Promise<Content[]> {
     const rows = await this.db.select().from(contents).where(eq(contents.userId, userId));
+    return rows.map(mapContent);
+  }
+
+  async findRecentByAffiliateOffer(
+    userId: string,
+    productId: string,
+    affiliateOfferId: string,
+    since: Date,
+  ): Promise<Content[]> {
+    const rows = await this.db
+      .select()
+      .from(contents)
+      .where(
+        and(
+          eq(contents.userId, userId),
+          gte(contents.createdAt, since),
+          sql`json_extract(${contents.metadata}, '$.productId') = ${productId}`,
+          sql`json_extract(${contents.metadata}, '$.affiliateOfferId') = ${affiliateOfferId}`,
+        ),
+      );
     return rows.map(mapContent);
   }
 

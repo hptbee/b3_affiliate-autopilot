@@ -1,5 +1,10 @@
 import { createAIProvider, createAffiliateContentGenerator, createAffiliateCoverMediaGenerator } from '@social-autopilot/ai';
-import { AffiliateContentService, MediaService } from '@social-autopilot/core';
+import {
+  AffiliateContentPipelineService,
+  AffiliateContentService,
+  AffiliateProductSelectionService,
+  MediaService,
+} from '@social-autopilot/core';
 import {
   createDatabase,
   createServices,
@@ -54,6 +59,11 @@ export function createAppContext(env: Env) {
     affiliateContentGenerator,
   );
 
+  const affiliateProductSelectionService = new AffiliateProductSelectionService(
+    services.productService,
+    services.contentRepository,
+  );
+
   const mediaRepository = new DrizzleMediaRepository(database);
   const mediaStorage = new R2MediaStorage(env.MEDIA_BUCKET);
   const coverMediaGenerator = createAffiliateCoverMediaGenerator(aiProvider);
@@ -66,7 +76,20 @@ export function createAppContext(env: Env) {
     'social-autopilot-media',
   );
 
-  return { ...services, aiProvider, affiliateContentService, mediaService, tokenStore };
+  const affiliateContentPipelineService = new AffiliateContentPipelineService(
+    affiliateProductSelectionService,
+    affiliateContentService,
+    mediaService,
+  );
+
+  return {
+    ...services,
+    aiProvider,
+    affiliateContentService,
+    affiliateContentPipelineService,
+    mediaService,
+    tokenStore,
+  };
 }
 
 export type AppContext = ReturnType<typeof createAppContext>;

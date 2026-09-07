@@ -11,6 +11,7 @@ function createInput(platform: 'facebook' | 'tiktok'): PublishPostInput {
       body: 'Caption',
       status: 'approved',
       contentType: 'video',
+      metadata: {},
       createdAt: new Date(),
       updatedAt: new Date(),
     },

@@ -16,7 +16,9 @@ export * from './types/affiliate.js';
 export * from './types/affiliate-content.js';
 export * from './types/media-generation.js';
 export * from './types/publishing.js';
-export * from './application/social-account-service.js';
+export * from './domain/affiliate-link-validation.js';
+export * from './application/affiliate-product-selection-service.js';
+export * from './application/affiliate-content-pipeline-service.js';
 
 export * from './application/content-service.js';
 export * from './application/affiliate-content-service.js';
@@ -25,3 +27,4 @@ export * from './application/scheduled-post-service.js';
 export * from './application/scheduler-service.js';
 export * from './application/publishing-service.js';
 export * from './application/product-service.js';
+export * from './application/social-account-service.js';

@@ -24,6 +24,7 @@ import { R2MediaStorage } from './storage/r2-media-storage.js';
 
 export interface ServiceContainer {
   contentService: ContentService;
+  contentRepository: DrizzleContentRepository;
   scheduledPostService: ScheduledPostService;
   publishingService: PublishingService;
   schedulerService: SchedulerService;
@@ -90,6 +91,7 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
 
   return {
     contentService,
+    contentRepository,
     scheduledPostService,
     publishingService,
     schedulerService,

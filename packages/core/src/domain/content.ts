@@ -18,8 +18,33 @@ export interface Content {
   body: string;
   status: ContentStatus;
   contentType: ContentType;
+  metadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** Well-known metadata keys for affiliate-generated content. */
+export interface AffiliateContentMetadata {
+  productId: string;
+  affiliateOfferId: string;
+  affiliateUrl: string;
+}
+
+export function parseAffiliateContentMetadata(
+  metadata: Record<string, unknown>,
+): AffiliateContentMetadata | null {
+  const productId = metadata.productId;
+  const affiliateOfferId = metadata.affiliateOfferId;
+  const affiliateUrl = metadata.affiliateUrl;
+  if (
+    typeof productId === 'string' &&
+    typeof affiliateOfferId === 'string' &&
+    typeof affiliateUrl === 'string' &&
+    affiliateUrl.trim().length > 0
+  ) {
+    return { productId, affiliateOfferId, affiliateUrl };
+  }
+  return null;
 }
 
 /**

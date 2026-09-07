@@ -1,4 +1,6 @@
 import type { Content } from '../domain/content.js';
+import { parseAffiliateContentMetadata } from '../domain/content.js';
+import { assertContentContainsAffiliateUrl } from '../domain/affiliate-link-validation.js';
 import type { ScheduledPost } from '../domain/scheduled-post.js';
 import type { SocialAccount, SocialPlatform } from '../domain/social-account.js';
 import { ConflictError, SocialPublishError, NotFoundError } from '../types/errors.js';
@@ -82,6 +84,8 @@ export class PublishingService {
       );
     }
 
+    this.assertPublishableAffiliateContent(content);
+
     const account = await this.socialAccountRepository.findById(input.socialAccountId);
     if (!account || account.userId !== user.userId) {
       throw new NotFoundError('SocialAccount', input.socialAccountId);
@@ -158,6 +162,8 @@ export class PublishingService {
       if (!content) {
         throw new NotFoundError('Content', post.contentId);
       }
+
+      this.assertPublishableAffiliateContent(content);
 
       const account = await this.socialAccountRepository.findById(post.socialAccountId);
       if (!account) {
@@ -255,5 +261,12 @@ export class PublishingService {
     }
 
     return attachments;
+  }
+
+  private assertPublishableAffiliateContent(content: Content): void {
+    const affiliateMeta = parseAffiliateContentMetadata(content.metadata);
+    if (affiliateMeta) {
+      assertContentContainsAffiliateUrl(content, affiliateMeta.affiliateUrl);
+    }
   }
 }
