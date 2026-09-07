@@ -121,6 +121,9 @@ function createService(options?: {
     async findDueForRefresh() {
       return publications;
     },
+    async findByUserId() {
+      return publications.map((item) => ({ ...item, latestSnapshot: null }));
+    },
   };
 
   const snapshotRepository: PostMetricSnapshotRepository = {

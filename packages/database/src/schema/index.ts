@@ -223,6 +223,35 @@ export const affiliateOffers = sqliteTable(
   ],
 );
 
+export const optimizationRecommendations = sqliteTable(
+  'optimization_recommendations',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    type: text('type').notNull(),
+    status: text('status').notNull().default('pending'),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    rationale: text('rationale').notNull(),
+    priority: text('priority').notNull(),
+    productId: text('product_id').references(() => products.id),
+    contentId: text('content_id').references(() => contents.id),
+    affiliateOfferId: text('affiliate_offer_id').references(() => affiliateOffers.id),
+    evidence: text('evidence', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    aiReasoning: text('ai_reasoning'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+  },
+  (table) => [
+    index('optimization_recommendations_user_status_idx').on(table.userId, table.status),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type SocialAccountRow = typeof socialAccounts.$inferSelect;
 export type ContentRow = typeof contents.$inferSelect;

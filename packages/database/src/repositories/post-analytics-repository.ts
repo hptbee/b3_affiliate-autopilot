@@ -149,6 +149,19 @@ export class DrizzlePostPublicationRepository implements PostPublicationReposito
     return Promise.all(rows.map((row) => this.withLatestSnapshot(mapPublication(row))));
   }
 
+  async findByUserId(userId: string): Promise<PostPublicationWithLatestMetrics[]> {
+    const rows = await this.db
+      .select({ publication: postPublications })
+      .from(postPublications)
+      .innerJoin(contents, eq(postPublications.contentId, contents.id))
+      .where(eq(contents.userId, userId))
+      .orderBy(desc(postPublications.publishedAt));
+
+    return Promise.all(
+      rows.map((row) => this.withLatestSnapshot(mapPublication(row.publication))),
+    );
+  }
+
   async findDueForRefresh(now: Date, staleAfterMs: number, limit: number): Promise<PostPublication[]> {
     const staleBefore = new Date(now.getTime() - staleAfterMs);
 

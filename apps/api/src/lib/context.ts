@@ -1,7 +1,8 @@
-import { createAIProvider, createAffiliateContentGenerator, createAffiliateCoverMediaGenerator } from '@social-autopilot/ai';
+import { createAIProvider, createAffiliateContentGenerator, createAffiliateCoverMediaGenerator, createOptimizationReasoningProvider } from '@social-autopilot/ai';
 import {
   AffiliateContentPipelineService,
   AffiliateContentService,
+  AffiliateOptimizationService,
   AffiliatePipelineSchedulerService,
   AffiliateProductSelectionService,
   MediaService,
@@ -16,6 +17,7 @@ import {
   CloudflarePublishQueue,
   DrizzleMediaRepository,
   DrizzlePipelineLockRepository,
+  DrizzleOptimizationRecommendationRepository,
   DrizzlePostMetricSnapshotRepository,
   DrizzlePostPublicationRepository,
   DrizzlePublishedPostSourceRepository,
@@ -123,12 +125,25 @@ export function createAppContext(env: Env) {
     parsePostAnalyticsScheduleConfig(env),
   );
 
+  const optimizationRecommendationRepository = new DrizzleOptimizationRecommendationRepository(
+    database,
+  );
+  const affiliateOptimizationService = new AffiliateOptimizationService(
+    optimizationRecommendationRepository,
+    postPublicationRepository,
+    services.contentRepository,
+    services.productService,
+    createOptimizationReasoningProvider(aiProvider),
+    services.logger,
+  );
+
   return {
     ...services,
     aiProvider,
     affiliateContentService,
     affiliateContentPipelineService,
     affiliatePipelineSchedulerService,
+    affiliateOptimizationService,
     postAnalyticsService,
     postAnalyticsRefreshSchedulerService,
     mediaService,

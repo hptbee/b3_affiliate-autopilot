@@ -25,6 +25,10 @@ export * from './domain/post-analytics.js';
 export * from './types/post-analytics.js';
 export * from './application/post-analytics-service.js';
 export * from './application/post-analytics-refresh-scheduler-service.js';
+export * from './domain/optimization.js';
+export * from './types/optimization.js';
+export * from './application/affiliate-optimization-analyzer.js';
+export * from './application/affiliate-optimization-service.js';
 
 export * from './application/content-service.js';
 export * from './application/affiliate-content-service.js';

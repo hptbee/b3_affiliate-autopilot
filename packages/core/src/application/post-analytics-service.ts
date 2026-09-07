@@ -35,6 +35,7 @@ export interface PostPublicationRepository {
   findByScheduledPostId(scheduledPostId: string): Promise<PostPublication | null>;
   findByContentId(contentId: string): Promise<PostPublicationWithLatestMetrics[]>;
   findByProductId(productId: string): Promise<PostPublicationWithLatestMetrics[]>;
+  findByUserId(userId: string): Promise<PostPublicationWithLatestMetrics[]>;
   findDueForRefresh(now: Date, staleAfterMs: number, limit: number): Promise<PostPublication[]>;
 }
 
