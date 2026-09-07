@@ -8,7 +8,7 @@ export function createContentTool(
 ): AgentTool<{ title: string; body: string }, { id: string; status: string }> {
   return {
     name: 'create_content',
-    description: 'Create a new TikTok content draft',
+    description: 'Create a new affiliate content draft',
     inputSchema: z.object({
       title: z.string().min(1),
       body: z.string().min(1),
@@ -84,7 +84,7 @@ export function schedulePostTool(
 > {
   return {
     name: 'schedule_post',
-    description: 'Schedule an approved TikTok post. Requires human approval first.',
+    description: 'Schedule an approved post to a distribution channel. Requires human approval first.',
     inputSchema: z.object({
       contentId: z.string().uuid(),
       socialAccountId: z.string().uuid(),
@@ -107,7 +107,7 @@ export function cancelScheduledPostTool(
 ): AgentTool<{ id: string }, { id: string; status: string }> {
   return {
     name: 'cancel_scheduled_post',
-    description: 'Cancel a scheduled TikTok post',
+    description: 'Cancel a scheduled distribution post',
     inputSchema: z.object({ id: z.string().uuid() }),
     async execute(input) {
       const post = await scheduledPostService.cancel(user, input.id);
@@ -125,7 +125,7 @@ export function listSocialAccountsTool(
 > {
   return {
     name: 'list_social_accounts',
-    description: 'List connected TikTok accounts for the current user',
+    description: 'List connected distribution accounts for the current user',
     inputSchema: z.object({}),
     async execute() {
       const accounts = await socialAccountRepository.findByUserId(user.userId);

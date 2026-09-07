@@ -3,6 +3,8 @@ export * from './domain/scheduled-post.js';
 export * from './domain/social-account.js';
 export * from './domain/user.js';
 export * from './domain/media.js';
+export * from './domain/product.js';
+export * from './domain/affiliate-offer.js';
 
 export * from './types/errors.js';
 export * from './types/logger.js';

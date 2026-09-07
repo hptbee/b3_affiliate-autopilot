@@ -53,7 +53,7 @@ function createAccount(overrides: Partial<SocialAccount> = {}): SocialAccount {
   return {
     id: 'account-1',
     userId: 'user-1',
-    platform: 'tiktok',
+    platform: 'facebook',
     externalAccountId: 'ext-1',
     displayName: 'Test Account',
     accessTokenRef: 'token-ref',
@@ -285,6 +285,20 @@ describe('ScheduledPostService', () => {
     });
     expect(first.id).not.toBe(second.id);
     expect(first.contentId).toBe(second.contentId);
+  });
+
+  it('can schedule to a TikTok account as a future distribution channel', async () => {
+    const { service } = createServices(
+      createContent(),
+      createScheduledPost(),
+      createAccount({ platform: 'tiktok' }),
+    );
+    const post = await service.create(user, {
+      contentId: 'content-1',
+      socialAccountId: 'account-1',
+      scheduledAt: future,
+    });
+    expect(post.status).toBe('scheduled');
   });
 });
 

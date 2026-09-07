@@ -46,7 +46,7 @@ export function ContentPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold">TikTok Content</h2>
+        <h2 className="text-2xl font-bold">Affiliate Content</h2>
         <p className="text-muted-foreground">Drafts must be approved before they can be scheduled</p>
       </div>
 

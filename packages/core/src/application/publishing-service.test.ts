@@ -51,7 +51,7 @@ function createAccount(): SocialAccount {
   return {
     id: 'account-1',
     userId: 'user-1',
-    platform: 'tiktok',
+    platform: 'facebook',
     externalAccountId: 'ext-1',
     displayName: 'Test',
     accessTokenRef: 'token-ref',
@@ -181,13 +181,13 @@ function createPublishingService(options: {
   };
 
   const mockPublisher: SocialPublisher = {
-    platform: 'tiktok',
+    platform: 'facebook',
     publish: vi.fn(async (): Promise<PublishPostResult> => {
       if (options.publishError) throw options.publishError;
       return (
         options.publishResult ?? {
           externalPostId: 'ext-post-1',
-          platform: 'tiktok',
+          platform: 'facebook',
           publishedAt: new Date(),
         }
       );
@@ -198,7 +198,7 @@ function createPublishingService(options: {
     scheduledPostRepository,
     contentRepository,
     socialAccountRepository,
-    new Map([['tiktok', mockPublisher]]),
+    new Map([['facebook', mockPublisher]]),
     createLogger('test'),
   );
 
@@ -228,6 +228,7 @@ describe('PublishingService', () => {
     expect(outcome.queueAction).toBe('ack');
     expect(outcome.disposition).toBe('already_published');
     expect(outcome.result?.externalPostId).toBe('already-published');
+    expect(outcome.result?.platform).toBe('facebook');
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 

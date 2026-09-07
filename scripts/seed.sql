@@ -15,11 +15,30 @@ INSERT OR IGNORE INTO social_accounts (
   access_token_ref, refresh_token_ref, token_expires_at,
   metadata, status, created_at, updated_at
 ) VALUES (
+  '10000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  'facebook',
+  'mock-facebook-1',
+  'Dev Facebook Page',
+  'token-ref-facebook',
+  NULL,
+  NULL,
+  '{}',
+  'active',
+  unixepoch(),
+  unixepoch()
+);
+
+INSERT OR IGNORE INTO social_accounts (
+  id, user_id, platform, external_account_id, display_name,
+  access_token_ref, refresh_token_ref, token_expires_at,
+  metadata, status, created_at, updated_at
+) VALUES (
   '10000000-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000001',
   'tiktok',
   'mock-tiktok-1',
-  'Dev TikTok',
+  'Dev TikTok (future channel)',
   'token-ref-tiktok',
   NULL,
   NULL,

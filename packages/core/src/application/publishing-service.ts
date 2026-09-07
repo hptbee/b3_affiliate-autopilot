@@ -62,12 +62,13 @@ export class PublishingService {
         entityId: scheduledPostId,
         status: 'published',
       });
+      const existingAccount = await this.socialAccountRepository.findById(post.socialAccountId);
       return {
         queueAction: 'ack',
         disposition: 'already_published',
         result: {
           externalPostId: post.externalPostId,
-          platform: 'tiktok',
+          platform: existingAccount?.platform ?? 'facebook',
           publishedAt: post.publishedAt ?? new Date(),
         },
       };

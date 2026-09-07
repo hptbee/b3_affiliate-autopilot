@@ -1,6 +1,10 @@
-# TikTok publisher (Phase 1 — not implemented)
+# TikTok publisher (PENDING / FUTURE — not implemented)
 
-MVP target modules (do not add real OAuth or TikTok HTTP here yet):
+TikTok is **not** the product center. It is a future distribution adapter behind `SocialPublisher`.
+
+Do not add real OAuth or TikTok HTTP here yet. Facebook is the first live distribution target (Phase 4).
+
+Planned modules:
 
 ```text
 packages/social/src/tiktok/
@@ -10,6 +14,6 @@ packages/social/src/tiktok/
   TikTokErrors.ts
 ```
 
-Until Phase 1C, `MockTikTokPublisher` is the only publisher. It must never be mistaken for a production TikTok client.
+Until that phase, `MockTikTokPublisher` is the only TikTok publisher. It must never be mistaken for a production TikTok client.
 
-Video files are uploaded to R2; this package only receives metadata + a Worker-resolved access token at publish time.
+Video/media files are uploaded to R2; this package only receives metadata + a Worker-resolved access token at publish time. Affiliate URLs stay separate from media assets.

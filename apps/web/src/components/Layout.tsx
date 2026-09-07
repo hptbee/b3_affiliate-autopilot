@@ -15,8 +15,8 @@ export function Layout() {
     <div className="flex min-h-screen">
       <aside className="w-64 border-r border-border bg-card p-4">
         <div className="mb-8 px-2">
-          <h1 className="text-xl font-bold">TikTok Autopilot</h1>
-          <p className="text-xs text-muted-foreground">AI content automation</p>
+          <h1 className="text-xl font-bold">Affiliate Autopilot</h1>
+          <p className="text-xs text-muted-foreground">AI affiliate content</p>
         </div>
         <nav className="space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (
