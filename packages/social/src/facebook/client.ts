@@ -24,6 +24,38 @@ export interface FacebookPublishFeedResult {
   id: string;
 }
 
+export interface FacebookPostEngagementResult {
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+}
+
+export interface FacebookInsightValue {
+  value?: number | string | Record<string, number>;
+}
+
+export interface FacebookInsightMetric {
+  name: string;
+  period: string;
+  values: FacebookInsightValue[];
+}
+
+export interface FacebookPostInsightsResult {
+  data: FacebookInsightMetric[];
+}
+
+export interface FacebookPostEngagementResponse {
+  reactions?: { summary?: { total_count?: number } };
+  comments?: { summary?: { total_count?: number } };
+  shares?: { count?: number };
+  error?: FacebookGraphErrorBody['error'];
+}
+
+export interface FacebookPostInsightsResponse {
+  data?: FacebookInsightMetric[];
+  error?: FacebookGraphErrorBody['error'];
+}
+
 export interface FacebookHttp {
   fetch: typeof fetch;
 }
@@ -90,6 +122,42 @@ export class FacebookGraphClient {
       throw new Error('Facebook photo publish returned no photo id');
     }
     return body;
+  }
+
+  async getPostEngagement(
+    postId: string,
+    accessToken: string,
+  ): Promise<FacebookPostEngagementResult> {
+    const url = this.buildUrl(`/${postId}`, {
+      fields: 'reactions.summary(true),comments.limit(0).summary(true),shares',
+      access_token: accessToken,
+    });
+    const response = await this.fetchImpl(url, { method: 'GET' });
+    const body = await this.readJson<FacebookPostEngagementResponse>(response);
+    this.assertOk(response, body);
+
+    return {
+      reactions: body.reactions?.summary?.total_count ?? null,
+      comments: body.comments?.summary?.total_count ?? null,
+      shares: body.shares?.count ?? null,
+    };
+  }
+
+  async getPostInsights(
+    postId: string,
+    accessToken: string,
+    metrics: string[],
+  ): Promise<FacebookPostInsightsResult> {
+    const url = this.buildUrl(`/${postId}/insights`, {
+      metric: metrics.join(','),
+      period: 'lifetime',
+      access_token: accessToken,
+    });
+    const response = await this.fetchImpl(url, { method: 'GET' });
+    const body = await this.readJson<FacebookPostInsightsResponse>(response);
+    this.assertOk(response, body);
+
+    return { data: body.data ?? [] };
   }
 
   private buildUrl(path: string, query?: Record<string, string>): string {

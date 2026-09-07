@@ -21,6 +21,10 @@ export * from './application/affiliate-product-selection-service.js';
 export * from './application/affiliate-content-pipeline-service.js';
 export * from './types/pipeline-lock.js';
 export * from './application/affiliate-pipeline-scheduler-service.js';
+export * from './domain/post-analytics.js';
+export * from './types/post-analytics.js';
+export * from './application/post-analytics-service.js';
+export * from './application/post-analytics-refresh-scheduler-service.js';
 
 export * from './application/content-service.js';
 export * from './application/affiliate-content-service.js';
