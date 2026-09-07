@@ -6,6 +6,9 @@ import {
   AffiliateProductSelectionService,
   MediaService,
   parseAffiliatePipelineScheduleConfig,
+  parsePostAnalyticsScheduleConfig,
+  PostAnalyticsRefreshSchedulerService,
+  PostAnalyticsService,
 } from '@social-autopilot/core';
 import {
   createDatabase,
@@ -13,10 +16,13 @@ import {
   CloudflarePublishQueue,
   DrizzleMediaRepository,
   DrizzlePipelineLockRepository,
+  DrizzlePostMetricSnapshotRepository,
+  DrizzlePostPublicationRepository,
+  DrizzlePublishedPostSourceRepository,
   EncryptedTokenStore,
   R2MediaStorage,
 } from '@social-autopilot/database';
-import { createSocialPublishers } from '@social-autopilot/social';
+import { createPostAnalyticsProviders, createSocialPublishers } from '@social-autopilot/social';
 import { createShopeeAffiliateNetwork } from '@social-autopilot/affiliate';
 import type { Env } from '../../worker-configuration';
 
@@ -93,12 +99,38 @@ export function createAppContext(env: Env) {
     parseAffiliatePipelineScheduleConfig(env),
   );
 
+  const postPublicationRepository = new DrizzlePostPublicationRepository(database);
+  const postMetricSnapshotRepository = new DrizzlePostMetricSnapshotRepository(database);
+  const publishedPostSourceRepository = new DrizzlePublishedPostSourceRepository(database);
+  const analyticsProviders = createPostAnalyticsProviders({
+    facebookApiVersion: env.FACEBOOK_GRAPH_API_VERSION,
+    useMockFacebook: env.USE_MOCK_FACEBOOK_PUBLISHER === 'true',
+  });
+  const postAnalyticsService = new PostAnalyticsService(
+    postPublicationRepository,
+    postMetricSnapshotRepository,
+    publishedPostSourceRepository,
+    services.socialAccountRepository,
+    services.contentRepository,
+    analyticsProviders,
+    tokenStore,
+    services.logger,
+  );
+  const postAnalyticsRefreshSchedulerService = new PostAnalyticsRefreshSchedulerService(
+    postAnalyticsService,
+    pipelineLockRepository,
+    services.logger,
+    parsePostAnalyticsScheduleConfig(env),
+  );
+
   return {
     ...services,
     aiProvider,
     affiliateContentService,
     affiliateContentPipelineService,
     affiliatePipelineSchedulerService,
+    postAnalyticsService,
+    postAnalyticsRefreshSchedulerService,
     mediaService,
     tokenStore,
   };

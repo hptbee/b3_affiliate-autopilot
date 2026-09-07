@@ -87,6 +87,61 @@ export const pipelineJobLocks = sqliteTable('pipeline_job_locks', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const postPublications = sqliteTable(
+  'post_publications',
+  {
+    id: text('id').primaryKey(),
+    scheduledPostId: text('scheduled_post_id')
+      .notNull()
+      .references(() => scheduledPosts.id),
+    contentId: text('content_id')
+      .notNull()
+      .references(() => contents.id),
+    socialAccountId: text('social_account_id')
+      .notNull()
+      .references(() => socialAccounts.id),
+    platform: text('platform').notNull(),
+    externalPostId: text('external_post_id').notNull(),
+    productId: text('product_id').references(() => products.id),
+    affiliateOfferId: text('affiliate_offer_id').references(() => affiliateOffers.id),
+    publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('post_publications_scheduled_post_id_idx').on(table.scheduledPostId),
+    index('post_publications_content_id_idx').on(table.contentId),
+    index('post_publications_product_id_idx').on(table.productId),
+  ],
+);
+
+export const postMetricSnapshots = sqliteTable(
+  'post_metric_snapshots',
+  {
+    id: text('id').primaryKey(),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => postPublications.id),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp' }).notNull(),
+    impressions: integer('impressions'),
+    reach: integer('reach'),
+    clicks: integer('clicks'),
+    reactions: integer('reactions'),
+    comments: integer('comments'),
+    shares: integer('shares'),
+    engagements: integer('engagements'),
+    rawMetrics: text('raw_metrics', { mode: 'json' }).$type<Record<string, unknown>>(),
+    fetchError: text('fetch_error'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  },
+  (table) => [
+    index('post_metric_snapshots_publication_fetched_idx').on(
+      table.publicationId,
+      table.fetchedAt,
+    ),
+  ],
+);
+
 export const scheduledPosts = sqliteTable(
   'scheduled_posts',
   {

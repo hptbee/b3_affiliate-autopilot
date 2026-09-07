@@ -7,6 +7,7 @@ import {
   userContextMiddleware,
 } from './middleware/index.js';
 import { affiliateContentRoutes } from './routes/affiliate-content.js';
+import { analyticsRoutes } from './routes/analytics.js';
 import { contentRoutes } from './routes/content.js';
 import { scheduledPostRoutes } from './routes/scheduled-posts.js';
 import { publishRoutes, socialAccountRoutes } from './routes/social-accounts.js';
@@ -33,6 +34,7 @@ app.get('/health', (c) =>
 app.route('/api/content', contentRoutes);
 app.route('/api/content', publishRoutes);
 app.route('/api/affiliate-content', affiliateContentRoutes);
+app.route('/api/analytics', analyticsRoutes);
 app.route('/api/products', productRoutes);
 app.route('/api/scheduled-posts', scheduledPostRoutes);
 app.route('/api/social-accounts', socialAccountRoutes);
