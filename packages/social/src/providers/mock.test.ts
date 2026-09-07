@@ -11,6 +11,7 @@ function createInput(platform: 'facebook' | 'tiktok'): PublishPostInput {
       body: 'Caption',
       status: 'approved',
       contentType: 'video',
+      metadata: {},
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -44,6 +45,8 @@ function createInput(platform: 'facebook' | 'tiktok'): PublishPostInput {
       updatedAt: new Date(),
     },
     idempotencyKey: 'post-1',
+    accessToken: 'page-token',
+    mediaAttachments: [],
   };
 }
 

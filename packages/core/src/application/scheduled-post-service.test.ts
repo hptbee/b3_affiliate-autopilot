@@ -43,6 +43,7 @@ function createContent(overrides: Partial<Content> = {}): Content {
     body: 'Body',
     status: 'approved',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -79,6 +80,16 @@ function createServices(
     async create(input) {
       const post = createScheduledPost({
         id: `post-new-${scheduledPosts.size}`,
+        ...input,
+      });
+      scheduledPosts.set(post.id, post);
+      extraPosts.push(post);
+      return post;
+    },
+    async createImmediate(input) {
+      const post = createScheduledPost({
+        id: `post-immediate-${scheduledPosts.size}`,
+        scheduledAt: new Date(),
         ...input,
       });
       scheduledPosts.set(post.id, post);
@@ -164,6 +175,9 @@ function createServices(
     async findByUserId() {
       return [...contentStore.values()];
     },
+    async findRecentByAffiliateOffer() {
+      return [];
+    },
     async update(id, input) {
       const existing = contentStore.get(id)!;
       const updated = { ...existing, ...input };
@@ -186,6 +200,13 @@ function createServices(
     async findByUserId() {
       return [account];
     },
+    async findByUserPlatformExternal() {
+      return null;
+    },
+    async upsert() {
+      return account;
+    },
+    async delete() {},
   };
 
   return {

@@ -8,6 +8,13 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const tokenVault = sqliteTable('token_vault', {
+  ref: text('ref').primaryKey(),
+  ciphertext: text('ciphertext').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const socialAccounts = sqliteTable(
   'social_accounts',
   {
@@ -42,6 +49,7 @@ export const contents = sqliteTable(
     body: text('body').notNull(),
     status: text('status').notNull().default('draft'),
     contentType: text('content_type').notNull().default('video'),
+    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   },
@@ -66,6 +74,18 @@ export const media = sqliteTable(
   },
   (table) => [index('media_content_id_idx').on(table.contentId)],
 );
+
+export const pipelineJobLocks = sqliteTable('pipeline_job_locks', {
+  jobName: text('job_name').primaryKey(),
+  status: text('status').notNull().default('idle'),
+  ownerId: text('owner_id'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  leaseExpiresAt: integer('lease_expires_at', { mode: 'timestamp' }),
+  lastCompletedAt: integer('last_completed_at', { mode: 'timestamp' }),
+  lastResult: text('last_result', { mode: 'json' }).$type<Record<string, unknown>>(),
+  lastError: text('last_error'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
 
 export const scheduledPosts = sqliteTable(
   'scheduled_posts',

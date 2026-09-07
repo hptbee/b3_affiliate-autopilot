@@ -7,6 +7,7 @@ import type {
   ScheduledPost,
   ScheduledPostStatus,
   CreateScheduledPostInput,
+  CreateImmediateScheduledPostInput,
   ScheduledPostRepository,
 } from '@social-autopilot/core';
 import { contents, scheduledPosts } from '../schema/index.js';
@@ -40,6 +41,27 @@ export class DrizzleScheduledPostRepository implements ScheduledPostRepository {
       contentId: input.contentId,
       socialAccountId: input.socialAccountId,
       scheduledAt: input.scheduledAt,
+      status: 'scheduled' as const,
+      publishedAt: null,
+      externalPostId: null,
+      error: null,
+      retryCount: 0,
+      queuedAt: null,
+      publishingStartedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.db.insert(scheduledPosts).values(row);
+    return mapScheduledPost(row);
+  }
+
+  async createImmediate(input: CreateImmediateScheduledPostInput): Promise<ScheduledPost> {
+    const now = new Date();
+    const row = {
+      id: generateId(),
+      contentId: input.contentId,
+      socialAccountId: input.socialAccountId,
+      scheduledAt: now,
       status: 'scheduled' as const,
       publishedAt: null,
       externalPostId: null,

@@ -17,6 +17,7 @@ const draftContent: Content = {
   body: 'Body',
   status: 'draft',
   contentType: 'video',
+  metadata: {},
   createdAt: new Date(),
   updatedAt: new Date(),
 };

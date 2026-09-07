@@ -10,6 +10,7 @@ const content = {
   body: 'Script\n\nCaption\n\nCTA',
   status: 'draft' as const,
   contentType: 'video' as const,
+  metadata: {},
   createdAt: new Date(),
   updatedAt: new Date(),
 };

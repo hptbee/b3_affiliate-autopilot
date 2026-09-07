@@ -65,6 +65,7 @@ function createMocks(options?: { offers?: AffiliateOffer[] }) {
     body: 'persisted body',
     status: 'draft',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -99,6 +100,11 @@ describe('AffiliateContentService', () => {
       expect.objectContaining({
         title: 'You need this',
         contentType: 'video',
+        metadata: {
+          productId: 'p1',
+          affiliateOfferId: 'o1',
+          affiliateUrl: 'https://shope.ee/w',
+        },
       }),
     );
     expect(result.content.status).toBe('draft');

@@ -12,6 +12,9 @@ import type {
   ScheduledPostRepository,
   SocialAccountRepository,
 } from '../application/scheduled-post-service.js';
+import type { MediaRepository } from '../application/media-service.js';
+import type { MediaStorage } from '../types/media-storage.js';
+import type { TokenStore } from '../types/token-store.js';
 import { SocialPublishError } from '../types/errors.js';
 import { createLogger } from '../types/logger.js';
 
@@ -42,6 +45,7 @@ function createContent(): Content {
     body: 'Body',
     status: 'approved',
     contentType: 'video',
+    metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -67,6 +71,7 @@ function createAccount(): SocialAccount {
 function emptyRepoMethods(): Pick<
   ScheduledPostRepository,
   | 'create'
+  | 'createImmediate'
   | 'findByUserId'
   | 'findByContentId'
   | 'findDue'
@@ -76,6 +81,9 @@ function emptyRepoMethods(): Pick<
 > {
   return {
     async create() {
+      throw new Error('not implemented');
+    },
+    async createImmediate() {
       throw new Error('not implemented');
     },
     async findByUserId() {
@@ -104,9 +112,10 @@ function createPublishingService(options: {
   acquireLock?: boolean;
   publishResult?: PublishPostResult;
   publishError?: Error;
+  contentOverride?: Content;
 }) {
   let post = options.post ?? createScheduledPost();
-  const content = createContent();
+  const content = options.contentOverride ?? createContent();
   const account = createAccount();
   const contentUpdates: UpdateContentInput[] = [];
   const statusUpdates: ContentStatus[] = [];
@@ -160,6 +169,9 @@ function createPublishingService(options: {
     async findByUserId() {
       return [content];
     },
+    async findRecentByAffiliateOffer() {
+      return [];
+    },
     async update(_id, input) {
       contentUpdates.push(input);
       return { ...content, ...input };
@@ -178,6 +190,43 @@ function createPublishingService(options: {
     async findByUserId() {
       return [account];
     },
+    async findByUserPlatformExternal() {
+      return null;
+    },
+    async upsert() {
+      return account;
+    },
+    async delete() {},
+  };
+
+  const tokenStore: TokenStore = {
+    async get() {
+      return 'page-token';
+    },
+    async put() {},
+    async delete() {},
+  };
+
+  const mediaRepository: MediaRepository = {
+    async create() {
+      throw new Error('not implemented');
+    },
+    async findById() {
+      return null;
+    },
+    async findByContentId() {
+      return [];
+    },
+  };
+
+  const mediaStorage: MediaStorage = {
+    async put() {
+      return { key: 'k', size: 0 };
+    },
+    async get() {
+      return null;
+    },
+    async delete() {},
   };
 
   const mockPublisher: SocialPublisher = {
@@ -200,6 +249,9 @@ function createPublishingService(options: {
     socialAccountRepository,
     new Map([['facebook', mockPublisher]]),
     createLogger('test'),
+    tokenStore,
+    mediaRepository,
+    mediaStorage,
   );
 
   return { service, mockPublisher, getPost: () => post, contentUpdates, statusUpdates };
@@ -280,6 +332,25 @@ describe('PublishingService', () => {
     const outcome = await service.publishScheduledPost('post-1');
     expect(outcome.queueAction).toBe('ack');
     expect(outcome.disposition).toBe('uncertain');
+    expect(mockPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('blocks publishing when affiliate metadata URL is missing from content', async () => {
+    const content = createContent();
+    content.metadata = {
+      productId: 'p1',
+      affiliateOfferId: 'o1',
+      affiliateUrl: 'https://shope.ee/w',
+    };
+    content.body = 'Missing affiliate link';
+
+    const { service, mockPublisher } = createPublishingService({
+      post: createScheduledPost(),
+      contentOverride: content,
+    });
+
+    const outcome = await service.publishScheduledPost('post-1');
+    expect(outcome.disposition).toBe('failed');
     expect(mockPublisher.publish).not.toHaveBeenCalled();
   });
 });

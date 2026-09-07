@@ -1,5 +1,6 @@
 import type { Content, ContentStatus, ContentType } from '../domain/content.js';
-import { canTransitionContentStatus } from '../domain/content.js';
+import { canTransitionContentStatus, parseAffiliateContentMetadata } from '../domain/content.js';
+import { assertContentContainsAffiliateUrl } from '../domain/affiliate-link-validation.js';
 import type { UserContext } from '../types/user-context.js';
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
 
@@ -7,6 +8,7 @@ export interface CreateContentInput {
   title: string;
   body: string;
   contentType?: ContentType;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateContentInput {
@@ -19,6 +21,12 @@ export interface ContentRepository {
   create(input: CreateContentInput & { userId: string }): Promise<Content>;
   findById(id: string): Promise<Content | null>;
   findByUserId(userId: string): Promise<Content[]>;
+  findRecentByAffiliateOffer(
+    userId: string,
+    productId: string,
+    affiliateOfferId: string,
+    since: Date,
+  ): Promise<Content[]>;
   update(id: string, input: UpdateContentInput): Promise<Content>;
   updateStatus(id: string, status: ContentStatus): Promise<Content>;
   delete(id: string): Promise<void>;
@@ -40,6 +48,7 @@ export class ContentService {
       title: input.title,
       body: input.body,
       contentType: input.contentType ?? 'video',
+      metadata: input.metadata ?? {},
     });
   }
 
@@ -62,12 +71,28 @@ export class ContentService {
       throw new ConflictError('Only draft content can be updated');
     }
 
+    const affiliateMeta = parseAffiliateContentMetadata(existing.metadata);
+    if (affiliateMeta && (input.body !== undefined || input.title !== undefined)) {
+      const nextTitle = input.title ?? existing.title;
+      const nextBody = input.body ?? existing.body;
+      assertContentContainsAffiliateUrl(
+        { title: nextTitle, body: nextBody },
+        affiliateMeta.affiliateUrl,
+      );
+    }
+
     return this.repository.update(id, input);
   }
 
   async approve(user: UserContext, id: string): Promise<Content> {
     const existing = await this.getById(user, id);
     this.assertTransition(existing.status, 'approved');
+
+    const affiliateMeta = parseAffiliateContentMetadata(existing.metadata);
+    if (affiliateMeta) {
+      assertContentContainsAffiliateUrl(existing, affiliateMeta.affiliateUrl);
+    }
+
     return this.repository.updateStatus(id, 'approved');
   }
 

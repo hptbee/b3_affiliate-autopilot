@@ -4,7 +4,7 @@ import {
   isPublishable,
   MAX_PUBLISH_RETRIES,
 } from '../domain/scheduled-post.js';
-import type { SocialAccount } from '../domain/social-account.js';
+import type { SocialAccount, SocialPlatform, SocialAccountStatus } from '../domain/social-account.js';
 import { isSocialPlatform } from '../domain/social-account.js';
 import type { UserContext } from '../types/user-context.js';
 import { ConflictError, NotFoundError, ValidationError } from '../types/errors.js';
@@ -16,8 +16,14 @@ export interface CreateScheduledPostInput {
   scheduledAt: Date;
 }
 
+export interface CreateImmediateScheduledPostInput {
+  contentId: string;
+  socialAccountId: string;
+}
+
 export interface ScheduledPostRepository {
   create(input: CreateScheduledPostInput): Promise<ScheduledPost>;
+  createImmediate(input: CreateImmediateScheduledPostInput): Promise<ScheduledPost>;
   findById(id: string): Promise<ScheduledPost | null>;
   findByUserId(userId: string): Promise<ScheduledPost[]>;
   findByContentId(contentId: string): Promise<ScheduledPost[]>;
@@ -32,9 +38,28 @@ export interface ScheduledPostRepository {
   reclaimStalePublishing(now: Date, leaseMs: number): Promise<number>;
 }
 
+export interface UpsertSocialAccountInput {
+  userId: string;
+  platform: SocialPlatform;
+  externalAccountId: string;
+  displayName: string;
+  accessTokenRef: string;
+  refreshTokenRef: string | null;
+  tokenExpiresAt: Date | null;
+  metadata: Record<string, unknown>;
+  status: SocialAccountStatus;
+}
+
 export interface SocialAccountRepository {
   findById(id: string): Promise<SocialAccount | null>;
   findByUserId(userId: string): Promise<SocialAccount[]>;
+  findByUserPlatformExternal(
+    userId: string,
+    platform: SocialPlatform,
+    externalAccountId: string,
+  ): Promise<SocialAccount | null>;
+  upsert(input: UpsertSocialAccountInput): Promise<SocialAccount>;
+  delete(id: string): Promise<void>;
 }
 
 export class ScheduledPostService {

@@ -1,5 +1,6 @@
 import type { Content } from '../domain/content.js';
 import { mapAffiliateDraftToContentFields } from '../domain/content.js';
+import { ensureAffiliateUrlInFields } from '../domain/affiliate-link-validation.js';
 import type { GeneratedAffiliateContentDraft } from '../types/affiliate-content.js';
 import type { AffiliateContentGenerator } from '../types/affiliate-content.js';
 import type { UserContext } from '../types/user-context.js';
@@ -44,15 +45,23 @@ export class AffiliateContentService {
       language: input.language,
     });
 
-    const { title, body } = mapAffiliateDraftToContentFields({
-      ...draft.copy,
-      videoScenePlan: draft.videoScenePlan,
-    });
+    const { title, body } = ensureAffiliateUrlInFields(
+      mapAffiliateDraftToContentFields({
+        ...draft.copy,
+        videoScenePlan: draft.videoScenePlan,
+      }),
+      offer.affiliateUrl,
+    );
 
     const content = await this.contentService.create(user, {
       title,
       body,
       contentType: 'video',
+      metadata: {
+        productId: product.id,
+        affiliateOfferId: offer.id,
+        affiliateUrl: offer.affiliateUrl,
+      },
     });
 
     return {

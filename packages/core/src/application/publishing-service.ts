@@ -1,17 +1,35 @@
 import type { Content } from '../domain/content.js';
+import { parseAffiliateContentMetadata } from '../domain/content.js';
+import { assertContentContainsAffiliateUrl } from '../domain/affiliate-link-validation.js';
 import type { ScheduledPost } from '../domain/scheduled-post.js';
 import type { SocialAccount, SocialPlatform } from '../domain/social-account.js';
-import { SocialPublishError, NotFoundError } from '../types/errors.js';
+import { ConflictError, SocialPublishError, NotFoundError } from '../types/errors.js';
 import type { Logger } from '../types/logger.js';
+import type { PublishMediaAttachment } from '../types/publishing.js';
+import type { TokenStore } from '../types/token-store.js';
+import type { UserContext } from '../types/user-context.js';
 import type { ContentRepository } from './content-service.js';
+import type { MediaRepository } from './media-service.js';
 import type { ScheduledPostRepository } from './scheduled-post-service.js';
 import type { SocialAccountRepository } from './scheduled-post-service.js';
+import type { MediaStorage } from '../types/media-storage.js';
 
 export interface PublishPostInput {
   content: Content;
   socialAccount: SocialAccount;
   scheduledPost: ScheduledPost;
   idempotencyKey: string;
+  accessToken: string;
+  mediaAttachments: PublishMediaAttachment[];
+}
+
+export interface PublishContentNowInput {
+  contentId: string;
+  socialAccountId: string;
+}
+
+export interface PublishContentNowResult extends PublishScheduledPostOutcome {
+  scheduledPost: ScheduledPost;
 }
 
 export interface PublishPostResult {
@@ -46,7 +64,50 @@ export class PublishingService {
     private readonly socialAccountRepository: SocialAccountRepository,
     private readonly publishers: Map<SocialPlatform, SocialPublisher>,
     private readonly logger: Logger,
+    private readonly tokenStore: TokenStore,
+    private readonly mediaRepository: MediaRepository,
+    private readonly mediaStorage: MediaStorage,
   ) {}
+
+  async publishContentNow(
+    user: UserContext,
+    input: PublishContentNowInput,
+  ): Promise<PublishContentNowResult> {
+    const content = await this.contentRepository.findById(input.contentId);
+    if (!content || content.userId !== user.userId) {
+      throw new NotFoundError('Content', input.contentId);
+    }
+
+    if (content.status !== 'approved') {
+      throw new ConflictError(
+        `Content must be approved to publish, current status: ${content.status}`,
+      );
+    }
+
+    this.assertPublishableAffiliateContent(content);
+
+    const account = await this.socialAccountRepository.findById(input.socialAccountId);
+    if (!account || account.userId !== user.userId) {
+      throw new NotFoundError('SocialAccount', input.socialAccountId);
+    }
+
+    if (account.status !== 'active') {
+      throw new ConflictError(`Social account is not active: ${account.status}`);
+    }
+
+    const scheduledPost = await this.scheduledPostRepository.createImmediate({
+      contentId: input.contentId,
+      socialAccountId: input.socialAccountId,
+    });
+
+    const outcome = await this.publishScheduledPost(scheduledPost.id);
+    const updated = await this.scheduledPostRepository.findById(scheduledPost.id);
+    if (!updated) {
+      throw new NotFoundError('ScheduledPost', scheduledPost.id);
+    }
+
+    return { ...outcome, scheduledPost: updated };
+  }
 
   async publishScheduledPost(scheduledPostId: string): Promise<PublishScheduledPostOutcome> {
     const start = Date.now();
@@ -102,6 +163,8 @@ export class PublishingService {
         throw new NotFoundError('Content', post.contentId);
       }
 
+      this.assertPublishableAffiliateContent(content);
+
       const account = await this.socialAccountRepository.findById(post.socialAccountId);
       if (!account) {
         throw new NotFoundError('SocialAccount', post.socialAccountId);
@@ -115,11 +178,24 @@ export class PublishingService {
         );
       }
 
+      const accessToken = await this.tokenStore.get(account.accessTokenRef);
+      if (!accessToken) {
+        throw new SocialPublishError(
+          'Social account access token is missing or expired',
+          'dead',
+          { socialAccountId: account.id },
+        );
+      }
+
+      const mediaAttachments = await this.loadMediaAttachments(content.id);
+
       const result = await publisher.publish({
         content,
         socialAccount: account,
         scheduledPost: post,
         idempotencyKey: scheduledPostId,
+        accessToken,
+        mediaAttachments,
       });
 
       await this.scheduledPostRepository.markPublished(scheduledPostId, result.externalPostId);
@@ -158,6 +234,39 @@ export class PublishingService {
       }
 
       return { queueAction: 'retry', disposition: 'failed' };
+    }
+  }
+
+  private async loadMediaAttachments(contentId: string): Promise<PublishMediaAttachment[]> {
+    const assets = await this.mediaRepository.findByContentId(contentId);
+    const attachments: PublishMediaAttachment[] = [];
+
+    for (const asset of assets) {
+      const stored = await this.mediaStorage.get(asset.key);
+      if (!stored) {
+        this.logger.warn('Media object missing from storage during publish', {
+          operation: 'publishing.loadMediaAttachments',
+          entityId: asset.id,
+        });
+        continue;
+      }
+
+      const body = await new Response(stored.body).arrayBuffer();
+      attachments.push({
+        id: asset.id,
+        mimeType: asset.mimeType,
+        mediaType: asset.mediaType,
+        body,
+      });
+    }
+
+    return attachments;
+  }
+
+  private assertPublishableAffiliateContent(content: Content): void {
+    const affiliateMeta = parseAffiliateContentMetadata(content.metadata);
+    if (affiliateMeta) {
+      assertContentContainsAffiliateUrl(content, affiliateMeta.affiliateUrl);
     }
   }
 }

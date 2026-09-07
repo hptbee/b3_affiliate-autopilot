@@ -27,6 +27,7 @@ function createMockContentService(): ContentService {
       body: input.body,
       status: 'draft' as const,
       contentType: 'video' as const,
+      metadata: {},
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
