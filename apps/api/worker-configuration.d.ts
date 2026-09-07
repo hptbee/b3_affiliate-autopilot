@@ -10,4 +10,7 @@ export interface Env {
   SHOPEE_AFFILIATE_APP_ID?: string;
   SHOPEE_AFFILIATE_SECRET?: string;
   SHOPEE_AFFILIATE_ENDPOINT?: string;
+  TOKEN_WRAP_KEY?: string;
+  FACEBOOK_GRAPH_API_VERSION?: string;
+  USE_MOCK_FACEBOOK_PUBLISHER?: string;
 }

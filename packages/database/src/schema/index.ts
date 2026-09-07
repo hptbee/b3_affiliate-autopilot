@@ -8,6 +8,13 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const tokenVault = sqliteTable('token_vault', {
+  ref: text('ref').primaryKey(),
+  ciphertext: text('ciphertext').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const socialAccounts = sqliteTable(
   'social_accounts',
   {

@@ -15,3 +15,4 @@ export * from './repositories/media-repository.js';
 export * from './container.js';
 export * from './storage/r2-media-storage.js';
 export * from './queue/cloudflare-queue.js';
+export * from './token/encrypted-token-store.js';

@@ -4,12 +4,14 @@ import {
   PublishingService,
   SchedulerService,
   ProductService,
+  SocialAccountService,
   createLogger,
   type Logger,
   type PublishQueue,
   type SocialPublisher,
   type SocialPlatform,
   type AffiliateNetwork,
+  type TokenStore,
 } from '@social-autopilot/core';
 import { createDatabase } from './index.js';
 import { DrizzleContentRepository } from './repositories/content-repository.js';
@@ -17,6 +19,8 @@ import { DrizzleScheduledPostRepository } from './repositories/scheduled-post-re
 import { DrizzleSocialAccountRepository } from './repositories/social-account-repository.js';
 import { DrizzleProductRepository } from './repositories/product-repository.js';
 import { DrizzleAffiliateOfferRepository } from './repositories/affiliate-offer-repository.js';
+import { DrizzleMediaRepository } from './repositories/media-repository.js';
+import { R2MediaStorage } from './storage/r2-media-storage.js';
 
 export interface ServiceContainer {
   contentService: ContentService;
@@ -24,7 +28,9 @@ export interface ServiceContainer {
   publishingService: PublishingService;
   schedulerService: SchedulerService;
   productService: ProductService;
+  socialAccountService: SocialAccountService;
   socialAccountRepository: DrizzleSocialAccountRepository;
+  mediaRepository: DrizzleMediaRepository;
   logger: Logger;
 }
 
@@ -33,6 +39,8 @@ export interface CreateServicesOptions {
   publishQueue: PublishQueue;
   publishers: Map<SocialPlatform, SocialPublisher>;
   affiliateNetwork: AffiliateNetwork;
+  tokenStore: TokenStore;
+  mediaBucket: R2Bucket;
   logger?: Logger;
 }
 
@@ -45,6 +53,8 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
   const socialAccountRepository = new DrizzleSocialAccountRepository(database);
   const productRepository = new DrizzleProductRepository(database);
   const affiliateOfferRepository = new DrizzleAffiliateOfferRepository(database);
+  const mediaRepository = new DrizzleMediaRepository(database);
+  const mediaStorage = new R2MediaStorage(options.mediaBucket);
 
   const contentService = new ContentService(contentRepository);
   const scheduledPostService = new ScheduledPostService(
@@ -53,12 +63,17 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
     socialAccountRepository,
   );
 
+  const socialAccountService = new SocialAccountService(socialAccountRepository, options.tokenStore);
+
   const publishingService = new PublishingService(
     scheduledPostRepository,
     contentRepository,
     socialAccountRepository,
     options.publishers,
     logger,
+    options.tokenStore,
+    mediaRepository,
+    mediaStorage,
   );
 
   const schedulerService = new SchedulerService(
@@ -79,7 +94,9 @@ export function createServices(options: CreateServicesOptions): ServiceContainer
     publishingService,
     schedulerService,
     productService,
+    socialAccountService,
     socialAccountRepository,
+    mediaRepository,
     logger,
   };
 }

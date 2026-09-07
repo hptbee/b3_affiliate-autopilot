@@ -12,6 +12,9 @@ import type {
   ScheduledPostRepository,
   SocialAccountRepository,
 } from '../application/scheduled-post-service.js';
+import type { MediaRepository } from '../application/media-service.js';
+import type { MediaStorage } from '../types/media-storage.js';
+import type { TokenStore } from '../types/token-store.js';
 import { SocialPublishError } from '../types/errors.js';
 import { createLogger } from '../types/logger.js';
 
@@ -67,6 +70,7 @@ function createAccount(): SocialAccount {
 function emptyRepoMethods(): Pick<
   ScheduledPostRepository,
   | 'create'
+  | 'createImmediate'
   | 'findByUserId'
   | 'findByContentId'
   | 'findDue'
@@ -76,6 +80,9 @@ function emptyRepoMethods(): Pick<
 > {
   return {
     async create() {
+      throw new Error('not implemented');
+    },
+    async createImmediate() {
       throw new Error('not implemented');
     },
     async findByUserId() {
@@ -178,6 +185,43 @@ function createPublishingService(options: {
     async findByUserId() {
       return [account];
     },
+    async findByUserPlatformExternal() {
+      return null;
+    },
+    async upsert() {
+      return account;
+    },
+    async delete() {},
+  };
+
+  const tokenStore: TokenStore = {
+    async get() {
+      return 'page-token';
+    },
+    async put() {},
+    async delete() {},
+  };
+
+  const mediaRepository: MediaRepository = {
+    async create() {
+      throw new Error('not implemented');
+    },
+    async findById() {
+      return null;
+    },
+    async findByContentId() {
+      return [];
+    },
+  };
+
+  const mediaStorage: MediaStorage = {
+    async put() {
+      return { key: 'k', size: 0 };
+    },
+    async get() {
+      return null;
+    },
+    async delete() {},
   };
 
   const mockPublisher: SocialPublisher = {
@@ -200,6 +244,9 @@ function createPublishingService(options: {
     socialAccountRepository,
     new Map([['facebook', mockPublisher]]),
     createLogger('test'),
+    tokenStore,
+    mediaRepository,
+    mediaStorage,
   );
 
   return { service, mockPublisher, getPost: () => post, contentUpdates, statusUpdates };

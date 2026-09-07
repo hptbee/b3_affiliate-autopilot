@@ -1,19 +1,10 @@
-# Facebook publisher (Phase 4 — not implemented)
+# Facebook publisher
 
-Facebook is the **first** distribution target. Do not add real OAuth or Graph API HTTP here yet.
+Facebook Page publishing via Meta Graph API **v26.0**.
 
-Before implementation: verify current Facebook/Meta API capabilities, permissions, publishing requirements, supported page/account types, and affiliate-link policies.
+- `FacebookClient.ts` → `client.ts` — Graph HTTP
+- `FacebookPublisher.ts` → `publisher.ts` — `SocialPublisher` adapter
+- `FacebookErrors.ts` → `errors.ts` — maps Graph errors to `SocialPublishError`
+- OAuth (`FacebookOAuth.ts`) — deferred; connect uses manual Page access token
 
-Planned modules:
-
-```text
-packages/social/src/facebook/
-  FacebookClient.ts
-  FacebookOAuth.ts
-  FacebookPublisher.ts
-  FacebookErrors.ts
-```
-
-Until Phase 4, `MockFacebookPublisher` is the only Facebook publisher. It must never be mistaken for a production Facebook client.
-
-The adapter should receive approved Content + MediaAsset metadata + an already-resolved affiliate URL. It must not generate tracking links or put Facebook-specific fields on the core Content entity.
+See `docs/research/facebook-graph-api.md` for verified capabilities and limitations.

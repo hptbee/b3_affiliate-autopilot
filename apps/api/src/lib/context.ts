@@ -5,26 +5,40 @@ import {
   createServices,
   CloudflarePublishQueue,
   DrizzleMediaRepository,
+  EncryptedTokenStore,
   R2MediaStorage,
 } from '@social-autopilot/database';
 import { createSocialPublishers } from '@social-autopilot/social';
 import { createShopeeAffiliateNetwork } from '@social-autopilot/affiliate';
 import type { Env } from '../../worker-configuration';
 
+const DEV_TOKEN_WRAP_KEY = 'local-dev-token-wrap-key-change-me';
+
 export function createAppContext(env: Env) {
   const publishQueue = new CloudflarePublishQueue(env.PUBLISH_QUEUE);
-  const publishers = createSocialPublishers();
+  const publishers = createSocialPublishers({
+    facebookApiVersion: env.FACEBOOK_GRAPH_API_VERSION,
+    useMockFacebook: env.USE_MOCK_FACEBOOK_PUBLISHER === 'true',
+  });
   const affiliateNetwork = createShopeeAffiliateNetwork({
     appId: env.SHOPEE_AFFILIATE_APP_ID,
     secret: env.SHOPEE_AFFILIATE_SECRET,
     endpoint: env.SHOPEE_AFFILIATE_ENDPOINT,
   });
 
+  const database = createDatabase(env.DB);
+  const tokenStore = new EncryptedTokenStore(
+    database,
+    env.TOKEN_WRAP_KEY ?? DEV_TOKEN_WRAP_KEY,
+  );
+
   const services = createServices({
     db: env.DB,
     publishQueue,
     publishers,
     affiliateNetwork,
+    tokenStore,
+    mediaBucket: env.MEDIA_BUCKET,
   });
 
   const aiProvider = createAIProvider({
@@ -40,7 +54,6 @@ export function createAppContext(env: Env) {
     affiliateContentGenerator,
   );
 
-  const database = createDatabase(env.DB);
   const mediaRepository = new DrizzleMediaRepository(database);
   const mediaStorage = new R2MediaStorage(env.MEDIA_BUCKET);
   const coverMediaGenerator = createAffiliateCoverMediaGenerator(aiProvider);
@@ -53,7 +66,7 @@ export function createAppContext(env: Env) {
     'social-autopilot-media',
   );
 
-  return { ...services, aiProvider, affiliateContentService, mediaService };
+  return { ...services, aiProvider, affiliateContentService, mediaService, tokenStore };
 }
 
 export type AppContext = ReturnType<typeof createAppContext>;

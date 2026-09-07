@@ -85,6 +85,16 @@ function createServices(
       extraPosts.push(post);
       return post;
     },
+    async createImmediate(input) {
+      const post = createScheduledPost({
+        id: `post-immediate-${scheduledPosts.size}`,
+        scheduledAt: new Date(),
+        ...input,
+      });
+      scheduledPosts.set(post.id, post);
+      extraPosts.push(post);
+      return post;
+    },
     async findById(id) {
       return scheduledPosts.get(id) ?? extraPosts.find((p) => p.id === id) ?? null;
     },
@@ -186,6 +196,13 @@ function createServices(
     async findByUserId() {
       return [account];
     },
+    async findByUserPlatformExternal() {
+      return null;
+    },
+    async upsert() {
+      return account;
+    },
+    async delete() {},
   };
 
   return {
